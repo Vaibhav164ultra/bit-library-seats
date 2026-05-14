@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BIT Library Seats | Bangalore Institute of Technology</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
+          boxShadow: {
+            glass: '0 8px 32px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06)',
+            seat: '0 4px 24px rgba(15,23,42,.45)',
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-deep: #030712;
+      --glass: rgba(255, 255, 255, 0.045);
+      --glass-border: rgba(255, 255, 255, 0.1);
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, rgba(99, 102, 241, 0.22), transparent),
+        radial-gradient(900px 500px at 100% 0%, rgba(236, 72, 153, 0.12), transparent),
+        var(--bg-deep);
+      color: #f8fafc;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .glass-panel {
+      background: var(--glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    .noise {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      z-index: 0;
+    }
+    .icon-svg {
+      display: inline-block;
+      flex-shrink: 0;
+      vertical-align: middle;
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,.06) 25%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.06) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s ease-in-out infinite;
+    }
+    .view-fade-enter { opacity: 0; transform: translateY(8px); }
+    .view-fade-enter-active { opacity: 1; transform: translateY(0); transition: opacity 0.35s ease, transform 0.35s ease; }
+    .login-hero-mesh {
+      background:
+        radial-gradient(ellipse 100% 80% at 15% 20%, rgba(99, 102, 241, 0.35), transparent 55%),
+        radial-gradient(ellipse 80% 60% at 85% 70%, rgba(236, 72, 153, 0.18), transparent 50%),
+        radial-gradient(ellipse 60% 50% at 50% 100%, rgba(34, 211, 238, 0.08), transparent 45%);
+    }
+    .login-orbit {
+      position: absolute;
+      inset: -20%;
+      background: conic-gradient(from 180deg at 50% 50%, rgba(99, 102, 241, 0.12), transparent, rgba(168, 85, 247, 0.1), transparent, rgba(99, 102, 241, 0.12));
+      animation: orbit-spin 28s linear infinite;
+      opacity: 0.5;
+    }
+    @keyframes orbit-spin {
+      to { transform: rotate(360deg); }
+    }
+    .login-card-glow {
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 24px 80px -20px rgba(79, 70, 229, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+    .dash-hero-strip {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 50%, rgba(99, 102, 241, 0.08) 100%);
+    }
+    .lib-card-hover {
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, border-color 0.25s ease;
+    }
+    .lib-card-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(129, 140, 248, 0.25);
+    }
+  </style>
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <div id="root" class="relative z-10"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
+
+    /**
+     * Timer policy: set DEMO_FAST_TIMERS to false for production-like durations.
+     * Inactivity uses real user events (mouse, keyboard, scroll) + tab visibility.
+     */
+    const DEMO_FAST_TIMERS = true;
+    const INACTIVITY_BEFORE_WARNING_MS = DEMO_FAST_TIMERS ? 45 * 1000 : 15 * 60 * 1000;
+    const GRACE_PERIOD_MS = DEMO_FAST_TIMERS ? 20 * 1000 : 3 * 60 * 1000;
+    const RESERVATION_HOLD_MS = 10 * 60 * 1000; /* 10 min pre-book — server is source of truth */
+    const SESSION_EXPIRING_SOON_MS = DEMO_FAST_TIMERS ? 20 * 1000 : 5 * 60 * 1000;
+
+    const PEAK_USAGE_LABEL = '2:00 PM – 5:00 PM (weekdays)';
+
+    const LIBRARIES = [
+      {
+        id: 'lib1',
+        name: 'Lib-1',
+        subtitle: 'Main Study Hall',
+        total: 24,
+        accent: 'from-violet-500 to-indigo-500',
+        perks: 'Open layout · Power strips',
+      },
+      {
+        id: 'lib2',
+        name: 'Lib-2',
+        subtitle: 'Engineering Library',
+        total: 20,
+        accent: 'from-sky-500 to-cyan-500',
+        perks: 'Stacks · Reference zone',
+      },
+      {
+        id: 'lib3',
+        name: 'Lib-3',
+        subtitle: 'Quiet Zone',
+        total: 16,
+        accent: 'from-emerald-500 to-teal-500',
+        perks: 'Silent · Individual focus',
+      },
+    ];
+
+    /** Same-origin when served by Express; override with window.BIT_API_BASE if needed */
+    const API_ROOT =
+      (typeof window !== 'undefined' && window.BIT_API_BASE) ||
+      (typeof location !== 'undefined' && location.protocol.startsWith('http')
+        ? `${location.origin}/api`
+        : 'http://localhost:3001/api');
+
+    async function api(path, options = {}) {
+      const url = `${String(API_ROOT).replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('bit_token') : null;
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(url, { ...options, headers });
+      let data = {};
+      try {
+        const text = await res.text();
+        if (text) data = JSON.parse(text);
+      } catch (_) {
+        /* non-JSON */
+      }
+      if (!res.ok) {
+        const msg = data.error || res.statusText || 'Request failed';
+        const err = new Error(msg);
+        err.status = res.status;
+        err.code = data.code;
+        throw err;
+      }
+      return data;
+    }
+
+    const uid = () => Math.random().toString(36).slice(2, 10);
+
+    function formatDuration(ms) {
+      if (ms == null || ms <= 0) return '0:00';
+      const s = Math.ceil(ms / 1000);
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return `${m}:${r < 10 ? '0' : ''}${r}`;
+    }
+
+    function formatClock(ms) {
+      if (ms == null || ms <= 0) return '00:00';
+      const total = Math.floor(ms / 1000);
+      const h = Math.floor(total / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      const s = total % 60;
+      const pad = (n) => (n < 10 ? '0' : '') + n;
+      return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+    }
+
+    /**
+     * Inline SVG icons — do NOT use lucide createIcons() inside React; it replaces DOM
+     * nodes and causes a blank page after modals close (e.g. check-in time picker).
+     */
+    const Icon = memo(function Icon({ name, size = 20, className = '' }) {
+      const s = {
+        xmlns: 'http://www.w3.org/2000/svg',
+        width: size,
+        height: size,
+        viewBox: '0 0 24 24',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 2,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+        className: 'icon-svg ' + (className || ''),
+        'aria-hidden': true,
+      };
+      switch (name) {
+        case 'check-circle':
+          return (
+            <svg {...s}>
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          );
+        case 'alert-triangle':
+          return (
+            <svg {...s}>
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          );
+        case 'x-circle':
+          return (
+            <svg {...s}>
+              <circle cx="12" cy="12" r="10" />
+              <path d="m15 9-6 6" />
+              <path d="m9 9 6 6" />
+            </svg>
+          );
+        case 'info':
+          return (
+            <svg {...s}>
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+          );
+        case 'users':
+          return (
+            <svg {...s}>
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          );
+        case 'trending-up':
+          return (
+            <svg {...s}>
+              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+              <polyline points="16 7 22 7 22 13" />
+            </svg>
+          );
+        case 'layout-grid':
+          return (
+            <svg {...s}>
+              <rect width="7" height="7" x="3" y="3" rx="1" />
+              <rect width="7" height="7" x="14" y="3" rx="1" />
+              <rect width="7" height="7" x="14" y="14" rx="1" />
+              <rect width="7" height="7" x="3" y="14" rx="1" />
+            </svg>
+          );
+        case 'graduation-cap':
+          return (
+            <svg {...s}>
+              <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+              <path d="M6 12h5a4 4 0 0 1 4 4v5" />
+              <path d="M18 12h-5a4 4 0 0 0-4 4v5" />
+            </svg>
+          );
+        case 'arrow-left':
+          return (
+            <svg {...s}>
+              <path d="m12 19-7-7 7-7" />
+              <path d="M19 12H5" />
+            </svg>
+          );
+        case 'sofa':
+          return (
+            <svg {...s}>
+              <path d="M20 10V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3" />
+              <path d="M4 15a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3H4Z" />
+              <path d="M6 15v2" />
+              <path d="M18 15v2" />
+            </svg>
+          );
+        case 'user-check':
+          return (
+            <svg {...s}>
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <polyline points="16 11 18 13 22 9" />
+            </svg>
+          );
+        case 'timer':
+          return (
+            <svg {...s}>
+              <line x1="10" x2="14" y1="2" y2="2" />
+              <line x1="12" x2="15" y1="14" y2="11" />
+              <circle cx="12" cy="14" r="8" />
+            </svg>
+          );
+        case 'book-open':
+          return (
+            <svg {...s}>
+              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+            </svg>
+          );
+        case 'log-out':
+          return (
+            <svg {...s}>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" x2="9" y1="12" y2="12" />
+            </svg>
+          );
+        case 'bell-ring':
+          return (
+            <svg {...s}>
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+              <path d="M4 2C2.8 3.7 2 5.7 2 8" />
+              <path d="M22 8c0-2.3-.8-4.3-2-6" />
+            </svg>
+          );
+        case 'clock':
+          return (
+            <svg {...s}>
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          );
+        case 'sparkles':
+          return (
+            <svg {...s}>
+              <path d="m12 3-1.2 3.6L7 8l3.8 1.4L12 13l1.2-3.6L17 8l-3.8-1.4L12 3z" />
+              <path d="M19 3v4M21 5h-4M5 19H3M5 21v-2" />
+            </svg>
+          );
+        default:
+          return (
+            <svg {...s}>
+              <circle cx="12" cy="12" r="10" />
+            </svg>
+          );
+      }
+    });
+
+    function useToasts() {
+      const [toasts, setToasts] = useState([]);
+      const push = useCallback((message, variant = 'info') => {
+        const id = uid();
+        setToasts((t) => [...t, { id, message, variant }]);
+        window.setTimeout(() => {
+          setToasts((t) => t.filter((x) => x.id !== id));
+        }, 4200);
+      }, []);
+      const remove = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), []);
+      return { toasts, push, remove };
+    }
+
+    function ToastStack({ toasts, onDismiss }) {
+      if (!toasts.length) return null;
+      return (
+        <div className="fixed bottom-24 right-4 z-[100] flex max-w-sm flex-col gap-2 sm:bottom-8 sm:right-8" role="status" aria-live="polite">
+          {toasts.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => onDismiss(t.id)}
+              className={
+                'glass-panel flex items-start gap-3 rounded-2xl px-4 py-3 text-left text-sm shadow-glass animate__animated animate__fadeInUp ' +
+                (t.variant === 'success'
+                  ? 'border-emerald-500/40 bg-emerald-500/10'
+                  : t.variant === 'warn'
+                  ? 'border-amber-500/40 bg-amber-500/10'
+                  : t.variant === 'error'
+                  ? 'border-rose-500/40 bg-rose-500/10'
+                  : 'border-white/15 bg-slate-900/70')
+              }
+            >
+              <span className="mt-0.5 shrink-0">
+                {t.variant === 'success' && <Icon name="check-circle" className="text-emerald-300" />}
+                {t.variant === 'warn' && <Icon name="alert-triangle" className="text-amber-300" />}
+                {t.variant === 'error' && <Icon name="x-circle" className="text-rose-300" />}
+                {t.variant === 'info' && <Icon name="info" className="text-sky-300" />}
+              </span>
+              <span className="text-slate-100">{t.message}</span>
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    /** Active session always wins over a hold timer */
+    function seatDerivedStatus(seat, now, myUserId, graceSeatId) {
+      if (seat.sessionUntil && seat.sessionUntil > now) {
+        const left = seat.sessionUntil - now;
+        const mine = myUserId && seat.holderId === myUserId;
+        const expiring = left < SESSION_EXPIRING_SOON_MS || (mine && graceSeatId === seat.id);
+        return expiring ? 'expiring' : 'occupied';
+      }
+      if (seat.reservationUntil && seat.reservationUntil > now) {
+        if (myUserId && seat.holderId === myUserId) return 'reserved';
+        if (seat.holderId) return 'reserved_other';
+      }
+      return 'available';
+    }
+
+    function DashboardSkeleton() {
+      return (
+        <div className="space-y-8">
+          <div className="glass-panel dash-hero-strip rounded-3xl p-6 sm:p-8">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-3">
+                <div className="skeleton h-5 w-40 rounded-md" />
+                <div className="skeleton h-10 w-64 max-w-full rounded-lg" />
+                <div className="skeleton h-4 w-48 rounded-md" />
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <div className="skeleton h-16 w-[7.5rem] rounded-2xl" />
+                <div className="skeleton h-16 w-[7.5rem] rounded-2xl" />
+                <div className="skeleton h-16 w-[7.5rem] rounded-2xl" />
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {[1, 2, 3].map((k) => (
+              <div key={k} className="glass-panel rounded-3xl p-8">
+                <div className="mb-6 flex justify-between">
+                  <div className="skeleton h-14 w-14 rounded-2xl" />
+                  <div className="skeleton h-6 w-16 rounded-full" />
+                </div>
+                <div className="skeleton mb-3 h-8 w-3/4 rounded-lg" />
+                <div className="skeleton mb-4 h-4 w-full rounded-lg" />
+                <div className="skeleton mb-6 h-3 w-full rounded-full" />
+                <div className="skeleton h-3 w-full rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function StatChip({ icon, label, value, sub, accent }) {
+      return (
+        <div
+          className={
+            'flex min-w-[148px] flex-1 items-center gap-3 rounded-2xl border px-4 py-3.5 backdrop-blur-md ' +
+            (accent
+              ? 'border-indigo-400/25 bg-gradient-to-br from-indigo-500/15 to-violet-600/10 shadow-lg shadow-indigo-950/30'
+              : 'glass-panel border-white/[0.07]')
+          }
+        >
+          <div
+            className={
+              'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ' +
+              (accent ? 'bg-white/10 text-white' : 'bg-white/[0.06] text-indigo-200')
+            }
+          >
+            <Icon name={icon} size={19} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+            <p className="text-xl font-bold tabular-nums tracking-tight text-white">{value}</p>
+            {sub && <p className="truncate text-[11px] text-slate-500">{sub}</p>}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [booting, setBooting] = useState(true);
+      const [view, setView] = useState('login'); /* login | dash | map */
+      const [user, setUser] = useState(null);
+      const [studentIdInput, setStudentIdInput] = useState('');
+      const [selectedLib, setSelectedLib] = useState(null);
+      const [seats, setSeats] = useState({});
+      const [now, setNow] = useState(Date.now());
+
+      /** Active session owned by current user (single session enforced) */
+      const [session, setSession] = useState(null);
+      /* session: { seatId, libId, sessionUntil, reservationUntil? } */
+
+      const [modal, setModal] = useState(null);
+      /* modal: { type:'reserve'|'sessionLen', seat } | { type:'idle', graceEndsAt } */
+
+      const { toasts, push, remove } = useToasts();
+      const sessionRef = useRef(null);
+      const lastActivityRef = useRef(Date.now());
+      const idleWarnedRef = useRef(false);
+      const activityThrottleRef = useRef(0);
+      const lastServerBumpRef = useRef(0);
+
+      useEffect(() => {
+        sessionRef.current = session;
+      }, [session]);
+
+      const releaseSeat = useCallback(async (reason) => {
+        const cur = sessionRef.current;
+        setModal(null);
+        idleWarnedRef.current = false;
+        try {
+          if (cur) {
+            await api('/actions/checkout', {
+              method: 'POST',
+              body: JSON.stringify({ libraryId: cur.libId, seatId: cur.seatId }),
+            });
+            const st = await api('/state');
+            setSeats(st.seats || {});
+            setSession(st.session ?? null);
+          } else {
+            setSession(null);
+          }
+        } catch (e) {
+          if (cur) push(e.message || 'Could not release seat.', 'error');
+          setSession(null);
+          try {
+            const st = await api('/state');
+            setSeats(st.seats || {});
+            setSession(st.session ?? null);
+          } catch (_) {
+            /* ignore */
+          }
+        }
+        if (reason === 'auto_idle') push('Seat released after inactivity grace period.', 'error');
+        if (reason === 'checkout') push('Checked out successfully.', 'success');
+      }, [push]);
+
+      const bumpActivity = useCallback(() => {
+        const t = Date.now();
+        if (t - activityThrottleRef.current < 800) return;
+        activityThrottleRef.current = t;
+        lastActivityRef.current = t;
+        if (idleWarnedRef.current && sessionRef.current) {
+          idleWarnedRef.current = false;
+          setModal((m) => (m && m.type === 'idle' ? null : m));
+          push('Activity detected — seat kept.', 'success');
+        }
+        const cur = sessionRef.current;
+        if (cur?.sessionUntil && t - lastServerBumpRef.current > 2500) {
+          lastServerBumpRef.current = t;
+          api('/me/activity', { method: 'POST' })
+            .then((data) => {
+              if (data && data.seats) setSeats(data.seats);
+              if (data && data.session !== undefined) setSession(data.session ?? null);
+            })
+            .catch(() => {});
+        }
+      }, [push]);
+
+      /** Restore session from token, or show login */
+      useEffect(() => {
+        const t = sessionStorage.getItem('bit_token');
+        if (!t) {
+          setBooting(false);
+          return undefined;
+        }
+        let cancelled = false;
+        (async () => {
+          try {
+            const data = await api('/state');
+            if (cancelled) return;
+            setUser(data.user);
+            setSeats(data.seats || {});
+            setSession(data.session ?? null);
+            setView('dash');
+          } catch {
+            sessionStorage.removeItem('bit_token');
+          } finally {
+            if (!cancelled) setBooting(false);
+          }
+        })();
+        return () => {
+          cancelled = true;
+        };
+      }, []);
+
+      useEffect(() => {
+        const id = window.setInterval(() => setNow(Date.now()), 1000);
+        return () => window.clearInterval(id);
+      }, []);
+
+      /** Sync seat map from server while logged in */
+      useEffect(() => {
+        if (!user || view === 'login' || booting) return undefined;
+        let cancelled = false;
+        const poll = async () => {
+          try {
+            const data = await api('/state');
+            if (cancelled) return;
+            setSeats(data.seats || {});
+            setSession(data.session ?? null);
+          } catch (_) {
+            /* keep last snapshot if offline */
+          }
+        };
+        poll();
+        const int = window.setInterval(poll, 2000);
+        return () => {
+          cancelled = true;
+          window.clearInterval(int);
+        };
+      }, [user, view, booting]);
+
+      /** Activity listeners only while checked in (session timer running) */
+      useEffect(() => {
+        if (!session?.sessionUntil) return undefined;
+        const onVis = () => {
+          if (document.visibilityState === 'visible') bumpActivity();
+        };
+        const onWinFocus = () => bumpActivity();
+        const onKey = () => bumpActivity();
+        const onScroll = () => bumpActivity();
+        const onMouse = () => bumpActivity();
+        window.addEventListener('keydown', onKey);
+        window.addEventListener('scroll', onScroll, true);
+        window.addEventListener('mousemove', onMouse, { passive: true });
+        window.addEventListener('click', onMouse, true);
+        window.addEventListener('focus', onWinFocus);
+        document.addEventListener('visibilitychange', onVis);
+        return () => {
+          window.removeEventListener('keydown', onKey);
+          window.removeEventListener('scroll', onScroll, true);
+          window.removeEventListener('mousemove', onMouse);
+          window.removeEventListener('click', onMouse, true);
+          window.removeEventListener('focus', onWinFocus);
+          document.removeEventListener('visibilitychange', onVis);
+        };
+      }, [session, bumpActivity]);
+
+      /** Inactivity → warning + grace (checked-in session only) */
+      useEffect(() => {
+        if (!session?.sessionUntil) return undefined;
+        const libSeats = seats[session.libId];
+        const mine = libSeats?.find((s) => s.id === session.seatId);
+        if (!mine?.sessionUntil || Date.now() > mine.sessionUntil) return undefined;
+
+        const id = window.setInterval(() => {
+          const t = Date.now();
+          if (!document.hasFocus()) return;
+          const since = t - lastActivityRef.current;
+          if (since >= INACTIVITY_BEFORE_WARNING_MS && !idleWarnedRef.current) {
+            idleWarnedRef.current = true;
+            setModal({ type: 'idle', graceEndsAt: t + GRACE_PERIOD_MS });
+            push('Inactivity detected — confirm to keep your seat.', 'warn');
+          }
+        }, 2000);
+        return () => window.clearInterval(id);
+      }, [session, seats, push]);
+
+      useEffect(() => {
+        if (!modal || modal.type !== 'idle') return undefined;
+        const id = window.setInterval(() => {
+          if (Date.now() > modal.graceEndsAt) {
+            releaseSeat('auto_idle');
+          }
+        }, 500);
+        return () => window.clearInterval(id);
+      }, [modal, releaseSeat]);
+
+      const login = async () => {
+        const id = (studentIdInput || '').trim();
+        if (!id) {
+          push('Enter your student ID.', 'warn');
+          return;
+        }
+        try {
+          const data = await api('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ studentId: id }),
+          });
+          sessionStorage.setItem('bit_token', data.token);
+          setUser(data.user);
+          setSeats(data.seats || {});
+          setSession(data.session ?? null);
+          setBooting(false);
+          setView('dash');
+          push(`Welcome, ${data.user.name}.`, 'success');
+        } catch (e) {
+          push(e.message || 'Sign-in failed.', 'error');
+        }
+      };
+
+      const logout = async () => {
+        try {
+          if (sessionRef.current) {
+            try {
+              await api('/actions/checkout', {
+                method: 'POST',
+                body: JSON.stringify({
+                  libraryId: sessionRef.current.libId,
+                  seatId: sessionRef.current.seatId,
+                }),
+              });
+            } catch (_) {
+              /* continue sign-out */
+            }
+          }
+          try {
+            await api('/auth/logout', { method: 'POST' });
+          } catch (_) {
+            /* ignore */
+          }
+        } finally {
+          sessionStorage.removeItem('bit_token');
+          setUser(null);
+          setSession(null);
+          setSeats({});
+          setView('login');
+          setSelectedLib(null);
+          push('Signed out.', 'info');
+        }
+      };
+
+      const startReservation = async (seat) => {
+        if (!user) {
+          push('Please sign in first.', 'warn');
+          setView('login');
+          return;
+        }
+        if (session) {
+          push('You already have an active session. Check out first.', 'warn');
+          return;
+        }
+        try {
+          const data = await api('/actions/reserve', {
+            method: 'POST',
+            body: JSON.stringify({ libraryId: selectedLib.id, seatId: seat.id }),
+          });
+          setSeats(data.seats || {});
+          setSession(data.session ?? null);
+          push(`Seat ${seat.num} reserved — check in within 10 minutes.`, 'info');
+          setModal({ type: 'sessionLen', seat });
+        } catch (e) {
+          push(e.message || 'Could not reserve seat.', e.status === 409 ? 'warn' : 'error');
+        }
+      };
+
+      const confirmCheckIn = async (minutes) => {
+        if (!session || !user) return;
+        try {
+          const data = await api('/actions/checkin', {
+            method: 'POST',
+            body: JSON.stringify({
+              libraryId: session.libId,
+              seatId: session.seatId,
+              minutes,
+            }),
+          });
+          setSeats(data.seats || {});
+          setSession(data.session ?? null);
+          lastActivityRef.current = Date.now();
+          idleWarnedRef.current = false;
+          setModal(null);
+          push(`Checked in — session ${minutes} min.`, 'success');
+        } catch (e) {
+          push(e.message || 'Check-in failed.', 'error');
+        }
+      };
+
+      const openMap = (lib) => {
+        setSelectedLib(lib);
+        setView('map');
+      };
+
+      const studyingCount = useMemo(() => {
+        let n = 0;
+        Object.values(seats).forEach((arr) => {
+          arr.forEach((s) => {
+            if (s.sessionUntil && s.sessionUntil > now) n++;
+          });
+        });
+        return n;
+      }, [seats, now]);
+
+      const campusOverview = useMemo(() => {
+        let totalSeats = 0;
+        let available = 0;
+        let checkedIn = 0;
+        LIBRARIES.forEach((lib) => {
+          totalSeats += lib.total;
+          const list = seats[lib.id] || [];
+          list.forEach((s) => {
+            if (seatDerivedStatus(s, now, user?.id, null) === 'available') available++;
+            if (s.sessionUntil && s.sessionUntil > now) checkedIn++;
+          });
+        });
+        const freePct = totalSeats ? Math.round((available / totalSeats) * 100) : 0;
+        const occPct = totalSeats ? Math.round((checkedIn / totalSeats) * 100) : 0;
+        return { totalSeats, available, checkedIn, freePct, occPct };
+      }, [seats, now, user]);
+
+      const dashGreeting = useMemo(() => {
+        const h = new Date(now).getHours();
+        if (h < 12) return 'Good morning';
+        if (h < 17) return 'Good afternoon';
+        return 'Good evening';
+      }, [now]);
+
+      const dashDateLabel = useMemo(() => {
+        return new Intl.DateTimeFormat('en-IN', {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric',
+        }).format(new Date(now));
+      }, [now]);
+
+      const graceSeatId = modal && modal.type === 'idle' ? session?.seatId : null;
+
+      const renderLogin = () => (
+        <div className="relative flex min-h-screen flex-col overflow-hidden lg:flex-row animate__animated animate__fadeIn">
+          <div className="relative flex flex-1 flex-col justify-center overflow-hidden px-6 py-14 sm:px-10 lg:min-h-screen lg:px-14 lg:py-20 xl:px-20">
+            <div className="login-hero-mesh pointer-events-none absolute inset-0" aria-hidden="true" />
+            <div className="login-orbit pointer-events-none absolute left-1/2 top-1/2 h-[140%] w-[140%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl" aria-hidden="true" />
+
+            <div className="relative z-10 max-w-xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-200/90 backdrop-blur-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                </span>
+                Bangalore Institute of Technology
+              </div>
+
+              <h1 className="mt-6 text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl xl:text-[3.25rem]">
+                Library seats,{' '}
+                <span className="bg-gradient-to-r from-indigo-200 via-white to-cyan-200 bg-clip-text text-transparent">without the chaos.</span>
+              </h1>
+              <p className="mt-5 max-w-md text-base leading-relaxed text-slate-400 sm:text-lg">
+                Check live availability across Lib-1, Lib-2, and Lib-3. Reserve a desk, check in when you arrive, and study with fair, automated session rules.
+              </p>
+
+              <ul className="mt-10 space-y-4">
+                {[
+                  { icon: 'layout-grid', t: 'Three halls, one glance', d: 'Occupancy and free seats update as students check in and out.' },
+                  { icon: 'clock', t: 'Smart sessions', d: 'Timers and gentle nudges keep seats turning for everyone.' },
+                  { icon: 'users', t: 'Built for busy days', d: 'See how many peers are studying right now campus-wide.' },
+                ].map((row) => (
+                  <li key={row.t} className="flex gap-4 rounded-2xl border border-white/5 bg-white/[0.03] p-4 backdrop-blur-sm transition hover:border-white/10 hover:bg-white/[0.05]">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-200 ring-1 ring-indigo-400/20">
+                      <Icon name={row.icon} size={20} />
+                    </span>
+                    <div>
+                      <p className="font-semibold text-white">{row.t}</p>
+                      <p className="mt-0.5 text-sm leading-snug text-slate-500">{row.d}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="mt-10 text-xs text-slate-600">
+                Official campus pilot · Use your institute student ID to continue
+              </p>
+            </div>
+          </div>
+
+          <div className="relative z-10 flex flex-1 items-center justify-center px-5 pb-16 pt-4 sm:px-8 lg:pb-12 lg:pt-12">
+            <div className="glass-panel login-card-glow w-full max-w-md rounded-[1.75rem] border border-white/10 p-8 sm:rounded-[2rem] sm:p-10">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 p-2.5 shadow-lg shadow-indigo-900/50">
+                  <Icon name="sparkles" size={22} className="text-white" />
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Student access
+                </span>
+              </div>
+              <h2 className="mt-4 text-2xl font-bold tracking-tight text-white">Sign in to continue</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-400">Enter your student ID — you will stay signed in until you log out.</p>
+
+              <label className="mt-8 block text-xs font-semibold uppercase tracking-wider text-slate-500" htmlFor="sid">
+                Student ID
+              </label>
+              <div className="relative mt-2">
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+                  <Icon name="graduation-cap" size={18} />
+                </span>
+                <input
+                  id="sid"
+                  autoComplete="username"
+                  value={studentIdInput}
+                  onChange={(e) => setStudentIdInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && login()}
+                  placeholder="e.g. 1BI21CS000"
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/40 py-3.5 pl-12 pr-4 text-sm font-medium text-white outline-none ring-0 transition placeholder:text-slate-600 focus:border-indigo-400/70 focus:bg-slate-950/60 focus:ring-2 focus:ring-indigo-500/30"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={login}
+                className="group mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 via-violet-600 to-fuchsia-600 py-4 text-sm font-bold text-white shadow-xl shadow-indigo-950/40 transition hover:brightness-110 active:scale-[0.99]"
+              >
+                Enter dashboard
+                <span className="transition group-hover:translate-x-0.5" aria-hidden>
+                  →
+                </span>
+              </button>
+
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-white/5 pt-6 text-[11px] text-slate-500">
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon name="check-circle" size={14} className="text-emerald-500/90" /> One seat at a time
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon name="clock" size={14} className="text-sky-500/90" /> Inactivity check after check-in
+                </span>
+              </div>
+              <p className="mt-4 text-center text-[10px] leading-relaxed text-slate-600">
+                <strong className="text-slate-500">Where to run:</strong> in Terminal, <code className="rounded bg-white/10 px-1 text-slate-400">cd</code> to the{' '}
+                <code className="rounded bg-white/10 px-1 text-slate-400">bit-library-seats</code> folder, run <code className="rounded bg-white/10 px-1 text-slate-400">npm start</code>, then use the link below (or run <code className="rounded bg-white/10 px-1 text-slate-400">npm run browse</code> in a second terminal on Windows).
+              </p>
+              <div className="mt-3 flex justify-center">
+                <a
+                  href="http://localhost:3001/"
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-500/25 px-5 py-2.5 text-sm font-semibold text-indigo-100 ring-1 ring-indigo-400/40 transition hover:bg-indigo-500/35 hover:text-white"
+                >
+                  Open app: http://localhost:3001
+                </a>
+              </div>
+              <p className="mt-2 text-center text-[10px] text-slate-600">
+                Only the three student IDs in <code className="rounded bg-white/10 px-1 text-slate-400">server/config.js</code> may sign in. After editing them, stop the server (Ctrl+C) and run <code className="rounded bg-white/10 px-1 text-slate-400">npm start</code> again.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+
+      const renderDash = () => (
+        <div className="view-fade-enter-active relative mx-auto max-w-6xl px-4 pb-32 pt-6 sm:px-6">
+          <div className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full bg-indigo-600/20 blur-[100px]" aria-hidden />
+          <div className="pointer-events-none absolute -right-20 top-40 h-64 w-64 rounded-full bg-fuchsia-600/15 blur-[90px]" aria-hidden />
+
+          <header className="relative mb-8 space-y-6">
+            <div className="glass-panel dash-hero-strip rounded-3xl border border-white/10 p-6 sm:p-8">
+              <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300/90">Dashboard</p>
+                  <h2 className="mt-2 truncate text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                    {dashGreeting},{' '}
+                    <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">{user?.name}</span>
+                  </h2>
+                  <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-400">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-2 py-0.5 text-slate-300 ring-1 ring-white/10">
+                      <Icon name="clock" size={14} className="text-indigo-300" />
+                      {dashDateLabel}
+                    </span>
+                    <span className="hidden text-slate-600 sm:inline">·</span>
+                    <span className="text-slate-500">Pick a hall to view the live seat map.</span>
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-3 lg:max-w-md lg:justify-end">
+                  <div className="flex min-w-[6.5rem] flex-1 flex-col rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-center sm:min-w-0 sm:flex-none">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300/90">Free seats</span>
+                    <span className="mt-1 text-2xl font-bold tabular-nums text-white">{campusOverview.available}</span>
+                    <span className="text-[10px] text-emerald-200/70">of {campusOverview.totalSeats}</span>
+                  </div>
+                  <div className="flex min-w-[6.5rem] flex-1 flex-col rounded-2xl border border-indigo-500/25 bg-indigo-500/10 px-4 py-3 text-center sm:min-w-0 sm:flex-none">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-200/90">Checked in</span>
+                    <span className="mt-1 text-2xl font-bold tabular-nums text-white">{campusOverview.checkedIn}</span>
+                    <span className="text-[10px] text-indigo-200/70">{campusOverview.occPct}% campus</span>
+                  </div>
+                  <div className="flex min-w-[6.5rem] flex-1 flex-col rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center sm:min-w-0 sm:flex-none">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Open %</span>
+                    <span className="mt-1 text-2xl font-bold tabular-nums text-white">{campusOverview.freePct}%</span>
+                    <span className="text-[10px] text-slate-500">availability</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-stretch sm:justify-between">
+              <div className="flex flex-1 flex-wrap gap-3 sm:min-w-0 sm:flex-[1_1_14rem]">
+                <StatChip icon="users" label="Studying now" value={studyingCount} sub="Live checked-in count" />
+                <StatChip icon="trending-up" label="Peak usage" value="High" sub={PEAK_USAGE_LABEL} accent />
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-slate-400 sm:max-w-xs">
+                <Icon name="info" size={18} className="shrink-0 text-sky-400/80" />
+                <span>Reservations last 10 minutes until you check in. One active session per account.</span>
+              </div>
+            </div>
+          </header>
+
+          {booting ? (
+            <DashboardSkeleton />
+          ) : (
+            <div>
+              <div className="mb-5 flex items-end justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-white sm:text-xl">Your libraries</h3>
+                  <p className="mt-1 text-sm text-slate-500">Tap a card to open the interactive floor plan.</p>
+                </div>
+              </div>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {LIBRARIES.map((lib) => {
+                  const list = seats[lib.id] || [];
+                  const occ = list.filter((s) => s.sessionUntil && s.sessionUntil > now).length;
+                  const avail = list.filter((s) => {
+                    const st = seatDerivedStatus(s, now, user?.id, null);
+                    return st === 'available';
+                  }).length;
+                  const pct = lib.total ? Math.round((occ / lib.total) * 100) : 0;
+                  const freeBar = lib.total ? Math.round((avail / lib.total) * 100) : 0;
+                  return (
+                    <button
+                      key={lib.id}
+                      type="button"
+                      onClick={() => openMap(lib)}
+                      className="lib-card-hover glass-panel group relative overflow-hidden rounded-3xl border border-white/[0.07] p-8 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                    >
+                      <div className={`pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-gradient-to-br ${lib.accent} opacity-25 blur-3xl transition duration-500 group-hover:opacity-40`} />
+                      <div className={`pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r ${lib.accent} opacity-40`} />
+
+                      <div className="relative flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            </span>
+                            Live
+                          </span>
+                          <h3 className="mt-4 truncate text-2xl font-bold tracking-tight text-white">{lib.name}</h3>
+                          <p className="mt-1 text-sm font-medium text-slate-400">{lib.subtitle}</p>
+                          <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-slate-500">{lib.perks}</p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                          <div className="rounded-2xl bg-white/[0.06] p-3 text-indigo-100 ring-1 ring-white/10 transition group-hover:bg-indigo-500/25 group-hover:text-white group-hover:ring-indigo-400/30">
+                            <Icon name="layout-grid" size={22} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="relative mt-8 grid grid-cols-2 gap-4">
+                        <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Available</p>
+                          <p className="mt-1 text-2xl font-bold tabular-nums text-white">
+                            {avail}
+                            <span className="text-base font-semibold text-slate-500">/{lib.total}</span>
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">In use</p>
+                          <p className="mt-1 text-2xl font-bold tabular-nums text-indigo-200">{pct}%</p>
+                        </div>
+                      </div>
+
+                      <div className="relative mt-5 space-y-2">
+                        <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                          <span>Occupancy</span>
+                          <span className="tabular-nums text-slate-400">{pct}%</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-white/5 ring-1 ring-white/5">
+                          <div
+                            className={`h-full rounded-full bg-gradient-to-r ${lib.accent} transition-all duration-700 ease-out`}
+                            style={{ width: `${Math.min(100, pct)}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                          <span>Free seats</span>
+                          <span className="tabular-nums text-slate-400">{freeBar}%</span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+                          <div
+                            className={`h-full rounded-full bg-gradient-to-r ${lib.accent} opacity-70 transition-all duration-700 ease-out`}
+                            style={{ width: `${Math.min(100, freeBar)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="relative mt-6 flex items-center justify-between border-t border-white/5 pt-5">
+                        <span className="text-xs font-medium text-slate-500">Floor plan · seat picker</span>
+                        <span className="inline-flex items-center gap-1 text-sm font-bold text-indigo-300 transition group-hover:text-white">
+                          Open map
+                          <span className="transition group-hover:translate-x-0.5" aria-hidden>
+                            →
+                          </span>
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+
+      const renderMap = () => {
+        if (!selectedLib) return null;
+        const list = seats[selectedLib.id] || [];
+        return (
+          <div className="view-fade-enter-active mx-auto max-w-6xl px-4 pb-40 pt-6 sm:px-6">
+            <button
+              type="button"
+              onClick={() => setView('dash')}
+              className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-300 transition hover:border-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+            >
+              <Icon name="arrow-left" size={14} /> Dashboard
+            </button>
+
+            <div className="glass-panel rounded-[1.75rem] p-6 sm:rounded-[2rem] sm:p-10">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">{selectedLib.name}</h2>
+                  <p className="mt-1 text-slate-400">{selectedLib.subtitle}</p>
+                  <div className="mt-4 flex flex-wrap gap-3 text-xs">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-3 py-1.5 font-medium text-emerald-200 ring-1 ring-emerald-500/30">
+                      <span className="h-2 w-2 rounded-sm bg-emerald-400" /> Available
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full bg-indigo-500/15 px-3 py-1.5 font-medium text-indigo-200 ring-1 ring-indigo-500/30">
+                      <span className="h-2 w-2 rounded-sm bg-indigo-400" /> Occupied
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full bg-amber-500/15 px-3 py-1.5 font-medium text-amber-200 ring-1 ring-amber-500/30">
+                      <span className="h-2 w-2 rounded-sm bg-amber-400" /> Reserved / expiring
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {!list.length ? (
+                <div className="mt-16 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 py-20 text-center">
+                  <Icon name="sofa" size={40} className="text-slate-600" />
+                  <p className="mt-4 text-lg font-semibold text-slate-300">No seats configured</p>
+                  <p className="mt-1 max-w-sm text-sm text-slate-500">This library has no seats yet. Contact admin.</p>
+                </div>
+              ) : (
+                <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+                  {list.map((seat) => {
+                    const st = seatDerivedStatus(seat, now, user?.id, graceSeatId);
+                    const mineReserved = session && session.seatId === seat.id && session.reservationUntil && !session.sessionUntil;
+                    const mineOccupied = session && session.seatId === seat.id && session.sessionUntil;
+                    const disabled =
+                      (st === 'occupied' || st === 'expiring' || st === 'reserved_other') &&
+                      !(mineOccupied || mineReserved);
+                    const timerMs =
+                      mineReserved && seat.reservationUntil
+                        ? seat.reservationUntil - now
+                        : seat.sessionUntil
+                        ? seat.sessionUntil - now
+                        : seat.reservationUntil
+                        ? seat.reservationUntil - now
+                        : 0;
+
+                    let btnClass =
+                      'relative flex min-h-[88px] flex-col items-center justify-center gap-1 rounded-2xl border-2 text-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ';
+                    if (st === 'available') btnClass += 'border-white/10 bg-white/[0.04] hover:scale-[1.02] hover:border-indigo-400/50 hover:bg-indigo-500/10 ';
+                    else if (st === 'reserved' || st === 'reserved_other')
+                      btnClass += 'border-amber-500/40 bg-amber-500/10 text-amber-100 ';
+                    else if (st === 'expiring') btnClass += 'border-amber-400/60 bg-gradient-to-b from-amber-500/20 to-orange-600/10 text-amber-50 ';
+                    else btnClass += 'border-white/5 bg-slate-800/40 text-slate-200 ';
+
+                    if (disabled) btnClass += 'cursor-not-allowed opacity-40 hover:scale-100 ';
+                    else btnClass += 'cursor-pointer active:scale-[0.98] ';
+
+                    if (mineOccupied || mineReserved) btnClass += 'ring-2 ring-indigo-400/80 ring-offset-2 ring-offset-slate-950 ';
+
+                    const titleParts = [`Seat ${seat.num}`, seat.holderName ? `Holder: ${seat.holderName}` : '', st.toUpperCase()];
+                    return (
+                      <button
+                        key={seat.id}
+                        type="button"
+                        disabled={disabled}
+                        title={titleParts.filter(Boolean).join(' · ')}
+                        aria-label={`Seat ${seat.num}, ${st}`}
+                        onClick={() => {
+                          if (disabled) return;
+                          if (st === 'available') {
+                            setModal({ type: 'reserve', seat });
+                            return;
+                          }
+                          if (mineReserved) {
+                            setModal({ type: 'sessionLen', seat });
+                          }
+                        }}
+                        className={btnClass}
+                      >
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">#{seat.num}</span>
+                        {(seat.sessionUntil || seat.reservationUntil) && timerMs > 0 && (
+                          <span className="tabular-nums text-sm font-bold text-white">{formatDuration(timerMs)}</span>
+                        )}
+                        {st === 'available' && <span className="text-[10px] font-medium text-slate-500">Open</span>}
+                        {mineOccupied && <Icon name="user-check" size={16} className="text-indigo-200" />}
+                        {mineReserved && <Icon name="timer" size={16} className="text-amber-200" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      const mineSeat =
+        session && seats[session.libId] ? seats[session.libId].find((s) => s.id === session.seatId) : null;
+      const sessionRemaining = mineSeat?.sessionUntil ? mineSeat.sessionUntil - now : 0;
+      const reservationRemaining = mineSeat?.reservationUntil && !mineSeat.sessionUntil ? mineSeat.reservationUntil - now : 0;
+
+      return (
+        <div className="min-h-screen">
+          <ToastStack toasts={toasts} onDismiss={remove} />
+
+          {view !== 'login' && (
+            <nav className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/75 shadow-lg shadow-black/20 backdrop-blur-xl">
+              <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
+                <button
+                  type="button"
+                  onClick={() => setView('dash')}
+                  className="group flex min-w-0 items-center gap-3 rounded-xl py-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-900/40 ring-1 ring-white/10 transition group-hover:ring-indigo-300/40">
+                    <Icon name="book-open" size={20} className="text-white" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2">
+                      <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-300">BIT</span>
+                      {view === 'dash' && (
+                        <span className="hidden rounded-md bg-white/5 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-500 ring-1 ring-white/10 sm:inline">
+                          Home
+                        </span>
+                      )}
+                    </span>
+                    <span className="block truncate text-base font-bold tracking-tight text-white sm:text-lg">Library Seats</span>
+                  </span>
+                </button>
+
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {user && (
+                    <div className="glass-panel hidden max-w-[200px] rounded-2xl px-3 py-2 sm:block">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Signed in</p>
+                      <p className="truncate text-sm font-semibold text-white">{user.name}</p>
+                      {!session && <p className="text-[11px] text-slate-500">No active session</p>}
+                      {session && (
+                        <p className="text-[11px] text-indigo-200">
+                          {mineSeat?.sessionUntil ? `Seat ${mineSeat.num} · session` : `Seat ${mineSeat?.num} · reserved`}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {user && (
+                    <button
+                      type="button"
+                      onClick={logout}
+                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                    >
+                      <Icon name="log-out" size={16} />
+                      <span className="hidden sm:inline">Sign out</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </nav>
+          )}
+
+          <main>
+            {view === 'login' && renderLogin()}
+            {view === 'dash' && user && renderDash()}
+            {view === 'map' && user && renderMap()}
+          </main>
+
+          {/* Reserve modal */}
+          {modal && modal.type === 'reserve' && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md animate__animated animate__fadeIn" role="dialog" aria-modal="true">
+              <div className="glass-panel w-full max-w-md rounded-3xl p-8 shadow-glass animate__animated animate__zoomIn">
+                <h3 className="text-xl font-bold text-white">Seat {modal.seat.num}</h3>
+                <p className="mt-2 text-sm text-slate-400">Reserve for up to 10 minutes while you walk over. You must check in before the hold expires.</p>
+                <div className="mt-8 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setModal(null)}
+                    className="flex-1 rounded-2xl border border-white/10 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/5"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startReservation(modal.seat)}
+                    className="flex-1 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-900/30 hover:brightness-110"
+                  >
+                    Reserve
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Session length picker after reserve or direct */}
+          {modal && modal.type === 'sessionLen' && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md animate__animated animate__fadeIn" role="dialog" aria-modal="true">
+              <div className="glass-panel w-full max-w-md rounded-3xl p-8 shadow-glass animate__animated animate__zoomIn">
+                <h3 className="text-xl font-bold text-white">Check in — Seat {modal.seat.num}</h3>
+                <p className="mt-2 text-sm text-slate-400">Choose how long you plan to study. You can check out early anytime. Inactivity may prompt you to confirm presence.</p>
+                <div className="mt-8 grid grid-cols-2 gap-3">
+                  {[30, 60, 120, 180].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => confirmCheckIn(m)}
+                      className="rounded-2xl border border-white/10 bg-white/5 py-4 text-sm font-bold text-white transition hover:border-indigo-400/50 hover:bg-indigo-500/20"
+                    >
+                      {m} min
+                    </button>
+                  ))}
+                </div>
+                <button type="button" onClick={() => setModal(null)} className="mt-6 w-full text-center text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-300">
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Idle warning */}
+          {modal && modal.type === 'idle' && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-lg animate__animated animate__fadeIn" role="alertdialog" aria-modal="true">
+              <div className="glass-panel w-full max-w-md rounded-3xl border-amber-500/30 p-8 shadow-glass animate__animated animate__pulse">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-200">
+                  <Icon name="bell-ring" size={28} />
+                </div>
+                <h3 className="text-center text-xl font-bold text-white">Still at your seat?</h3>
+                <p className="mt-2 text-center text-sm text-slate-400">We have not detected keyboard, mouse, or scroll activity for a while. Respond before the grace period ends or your seat will be released.</p>
+                <p className="mt-6 text-center text-3xl font-bold tabular-nums text-amber-200">{formatClock(modal.graceEndsAt - now)}</p>
+                <div className="mt-8 flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      bumpActivity();
+                      idleWarnedRef.current = false;
+                      setModal(null);
+                      push('Presence confirmed — timer reset.', 'success');
+                    }}
+                    className="w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-bold text-slate-900 shadow-lg"
+                  >
+                    I am still studying
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      releaseSeat('checkout');
+                    }}
+                    className="w-full rounded-2xl border border-white/10 py-3 text-sm font-semibold text-slate-200 hover:bg-white/5"
+                  >
+                    I am leaving
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom session bar */}
+          {user && session && mineSeat && (
+            <div className="fixed bottom-4 left-1/2 z-30 w-[94%] max-w-lg -translate-x-1/2 animate__animated animate__slideInUp">
+              <div className="glass-panel flex items-center justify-between gap-4 rounded-3xl border-indigo-500/30 bg-indigo-950/40 p-4 shadow-glass">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/30 text-indigo-100">
+                    <Icon name="clock" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+                      {mineSeat.sessionUntil ? 'Session ends in' : 'Reservation ends in'}
+                    </p>
+                    <p className="truncate text-lg font-bold tabular-nums text-white">
+                      {mineSeat.sessionUntil ? formatClock(sessionRemaining) : formatClock(reservationRemaining)}
+                    </p>
+                    <p className="truncate text-xs text-slate-400">
+                      {LIBRARIES.find((l) => l.id === session.libId)?.name} · Seat {mineSeat.num}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => releaseSeat('checkout')}
+                  className="shrink-0 rounded-2xl bg-rose-500/90 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-rose-500"
+                >
+                  Check out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
