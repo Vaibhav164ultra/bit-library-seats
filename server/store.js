@@ -29,6 +29,7 @@ function initSeatsWithMockOccupancy() {
         reservationUntil: null,
         sessionUntil: occupied ? now + (15 + Math.random() * 90) * 60 * 1000 : null,
         lastActivityAt: null,
+        qrToken: crypto.randomBytes(16).toString('hex'),
       };
     });
   });
@@ -40,6 +41,16 @@ function loadFromDisk() {
     const data = JSON.parse(raw);
     if (data.seats && typeof data.seats === 'object' && Object.keys(data.seats).length > 0) {
       seats = data.seats;
+      let updated = false;
+      Object.keys(seats).forEach((libId) => {
+        seats[libId].forEach((s) => {
+          if (!s.qrToken) {
+            s.qrToken = crypto.randomBytes(16).toString('hex');
+            updated = true;
+          }
+        });
+      });
+      if (updated) persist();
       return;
     }
   } catch {
@@ -59,6 +70,16 @@ export function persist() {
 }
 
 export function cloneSeats() {
+  const copy = JSON.parse(JSON.stringify(seats));
+  Object.keys(copy).forEach((libId) => {
+    copy[libId].forEach((s) => {
+      delete s.qrToken;
+    });
+  });
+  return copy;
+}
+
+export function getSeatsWithTokens() {
   return JSON.parse(JSON.stringify(seats));
 }
 
@@ -149,11 +170,16 @@ export function reserveSeat(userId, userName, libraryId, seatId) {
   return getStatePayload(userId);
 }
 
-export function checkInSeat(userId, userName, libraryId, seatId, minutes) {
+export function checkInSeat(userId, userName, libraryId, seatId, minutes, qrToken) {
   const seat = findSeat(libraryId, seatId);
   if (!seat) {
     const err = new Error('Seat not found.');
     err.code = 'NOT_FOUND';
+    throw err;
+  }
+  if (!qrToken || (seat.qrToken !== qrToken && seat.qrToken.slice(-6).toUpperCase() !== qrToken.toUpperCase())) {
+    const err = new Error('Invalid QR code or verification code. Please scan the correct QR code on the bench.');
+    err.code = 'INVALID_QR';
     throw err;
   }
   if (seat.holderId !== userId) {

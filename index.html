@@ -25,6 +25,8 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
   <style>
     :root {
       --bg-deep: #030712;
@@ -505,6 +507,9 @@
       const [modal, setModal] = useState(null);
       /* modal: { type:'reserve'|'sessionLen', seat } | { type:'idle', graceEndsAt } */
 
+      const [manualCodeInput, setManualCodeInput] = useState('');
+      const [cameraActive, setCameraActive] = useState(false);
+
       const { toasts, push, remove } = useToasts();
       const sessionRef = useRef(null);
       const lastActivityRef = useRef(Date.now());
@@ -515,6 +520,160 @@
       useEffect(() => {
         sessionRef.current = session;
       }, [session]);
+
+      const processPendingCheckin = useCallback((currentSession, currentSeats) => {
+        const pendingStr = sessionStorage.getItem('bit_pending_checkin');
+        if (!pendingStr) return;
+        try {
+          const pending = JSON.parse(pendingStr);
+          sessionStorage.removeItem('bit_pending_checkin'); // Consume it
+
+          // Find the library for this seat
+          let foundLib = null;
+          let foundSeat = null;
+          for (const lib of LIBRARIES) {
+            const list = currentSeats[lib.id] || [];
+            const match = list.find((s) => s.id === pending.seatId);
+            if (match) {
+              foundLib = lib;
+              foundSeat = match;
+              break;
+            }
+          }
+
+          if (!foundSeat) {
+            push('Seat not found for the scanned QR code.', 'error');
+            return;
+          }
+
+          // Case 1: User has a reservation for THIS seat
+          if (currentSession && currentSession.seatId === pending.seatId && currentSession.reservationUntil && !currentSession.sessionUntil) {
+            setSelectedLib(foundLib);
+            setView('map');
+            setModal({ type: 'sessionLen', seat: foundSeat, qrToken: pending.qrToken });
+            push(`QR verified for Seat ${foundSeat.num}. Select session length.`, 'success');
+            return;
+          }
+
+          // Case 2: User has a reservation for a DIFFERENT seat
+          if (currentSession && currentSession.seatId !== pending.seatId) {
+            push(`You already hold a reservation for a different seat. You scanned Seat #${foundSeat.num}.`, 'error');
+            return;
+          }
+
+          // Case 3: User is checked in already
+          if (currentSession && currentSession.sessionUntil) {
+            if (currentSession.seatId === pending.seatId) {
+              push('You are already checked in to this seat.', 'info');
+            } else {
+              push('You already have an active check-in at another seat.', 'warn');
+            }
+            return;
+          }
+
+          // Case 4: User has no reservation at all. Prompt to reserve and check in directly.
+          if (!currentSession) {
+            setSelectedLib(foundLib);
+            setView('map');
+            setModal({ type: 'qrDirectReserve', seat: foundSeat, qrToken: pending.qrToken });
+            return;
+          }
+        } catch (e) {
+          console.error('Failed to parse pending check-in', e);
+        }
+      }, [push]);
+
+      const handleDirectReserveAndCheckIn = async (seat, qrToken) => {
+        try {
+          const data = await api('/actions/reserve', {
+            method: 'POST',
+            body: JSON.stringify({ libraryId: seat.id.split('-')[0], seatId: seat.id }),
+          });
+          setSeats(data.seats || {});
+          setSession(data.session ?? null);
+          setModal({ type: 'sessionLen', seat, qrToken });
+          push(`Seat ${seat.num} reserved automatically.`, 'success');
+        } catch (e) {
+          push(e.message || 'Failed to reserve seat.', 'error');
+        }
+      };
+
+      // Check for URL parameters on mount and handle pending check-ins
+      useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const checkinSeatId = params.get('checkinSeatId');
+        const qrToken = params.get('qrToken');
+        if (checkinSeatId && qrToken) {
+          sessionStorage.setItem('bit_pending_checkin', JSON.stringify({ seatId: checkinSeatId, qrToken }));
+          // Clean URL
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+        }
+      }, []);
+
+      const qrScannerRef = useRef(null);
+
+      useEffect(() => {
+        if (modal && modal.type === 'qrVerify' && cameraActive) {
+          const html5QrCode = new Html5Qrcode("qr-reader");
+          qrScannerRef.current = html5QrCode;
+          
+          html5QrCode.start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 }
+            },
+            (decodedText) => {
+              try {
+                let token = null;
+                let seatId = null;
+                
+                if (decodedText.startsWith('http')) {
+                  const url = new URL(decodedText);
+                  const params = new URLSearchParams(url.search);
+                  token = params.get('qrToken');
+                  seatId = params.get('checkinSeatId');
+                }
+                
+                // Fallback to raw text if not a URL
+                if (!token) {
+                  token = decodedText.trim();
+                  seatId = modal.seat.id;
+                }
+                
+                if (seatId === modal.seat.id && token) {
+                  html5QrCode.stop().then(() => {
+                    setCameraActive(false);
+                    setModal({ type: 'sessionLen', seat: modal.seat, qrToken: token });
+                    push('QR Code verified!', 'success');
+                  }).catch(() => {
+                    setCameraActive(false);
+                    setModal({ type: 'sessionLen', seat: modal.seat, qrToken: token });
+                  });
+                } else {
+                  push(`Wrong QR Code. This is Seat #${modal.seat.num}. Please scan the correct QR code.`, 'warn');
+                }
+              } catch (e) {
+                console.error(e);
+              }
+            },
+            () => {}
+          ).catch((err) => {
+            console.warn("Camera access failed", err);
+            push("Could not open camera. Try typing the backup code.", "warn");
+            setCameraActive(false);
+          });
+          
+          return () => {
+            if (qrScannerRef.current) {
+              try {
+                qrScannerRef.current.stop().catch(() => {});
+              } catch (e) {}
+            }
+          };
+        }
+      }, [modal, cameraActive, push]);
 
       const releaseSeat = useCallback(async (reason) => {
         const cur = sessionRef.current;
@@ -585,6 +744,11 @@
             setSeats(data.seats || {});
             setSession(data.session ?? null);
             setView('dash');
+            
+            // Process pending check-in after state is set
+            setTimeout(() => {
+              processPendingCheckin(data.session, data.seats || {});
+            }, 100);
           } catch {
             sessionStorage.removeItem('bit_token');
           } finally {
@@ -697,6 +861,10 @@
           setBooting(false);
           setView('dash');
           push(`Welcome, ${data.user.name}.`, 'success');
+          
+          setTimeout(() => {
+            processPendingCheckin(data.session, data.seats || {});
+          }, 100);
         } catch (e) {
           push(e.message || 'Sign-in failed.', 'error');
         }
@@ -751,14 +919,15 @@
           setSeats(data.seats || {});
           setSession(data.session ?? null);
           push(`Seat ${seat.num} reserved — check in within 10 minutes.`, 'info');
-          setModal({ type: 'sessionLen', seat });
+          setModal({ type: 'qrVerify', seat });
         } catch (e) {
           push(e.message || 'Could not reserve seat.', e.status === 409 ? 'warn' : 'error');
         }
       };
 
-      const confirmCheckIn = async (minutes) => {
+      const confirmCheckIn = async (minutes, qrTokenOverride) => {
         if (!session || !user) return;
+        const finalToken = qrTokenOverride || modal?.qrToken;
         try {
           const data = await api('/actions/checkin', {
             method: 'POST',
@@ -766,6 +935,7 @@
               libraryId: session.libId,
               seatId: session.seatId,
               minutes,
+              qrToken: finalToken,
             }),
           });
           setSeats(data.seats || {});
@@ -1243,6 +1413,16 @@
 
                 <div className="flex items-center gap-2 sm:gap-3">
                   {user && (
+                    <a
+                      href="/print-qrs.html"
+                      target="_blank"
+                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-indigo-300 hover:bg-white/10 transition"
+                    >
+                      <Icon name="layout-grid" size={16} />
+                      <span className="hidden md:inline">Print QR Codes</span>
+                    </a>
+                  )}
+                  {user && (
                     <div className="glass-panel hidden max-w-[200px] rounded-2xl px-3 py-2 sm:block">
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Signed in</p>
                       <p className="truncate text-sm font-semibold text-white">{user.name}</p>
@@ -1301,6 +1481,143 @@
             </div>
           )}
 
+          {/* QR Verification Modal */}
+          {modal && modal.type === 'qrVerify' && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md animate__animated animate__fadeIn" role="dialog" aria-modal="true">
+              <div className="glass-panel w-full max-w-md rounded-3xl p-8 shadow-glass animate__animated animate__zoomIn">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold text-white">Verify Seat {modal.seat.num}</h3>
+                  <button type="button" onClick={() => setModal(null)} className="text-slate-400 hover:text-white transition">
+                    <Icon name="x-circle" size={24} />
+                  </button>
+                </div>
+                <p className="text-sm text-slate-400 mb-6">
+                  Please scan the QR code placed on Seat #{modal.seat.num} using your camera, or enter the backup verification code.
+                </p>
+                
+                {/* Camera Scanner Viewport */}
+                {cameraActive ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black mb-6">
+                    <div id="qr-reader" style={{ width: '100%', minHeight: '260px' }}></div>
+                    <button 
+                      type="button" 
+                      onClick={() => setCameraActive(false)}
+                      className="absolute bottom-3 right-3 px-3 py-1.5 bg-slate-900/80 hover:bg-slate-900 text-xs font-bold rounded-xl text-slate-300 z-10"
+                    >
+                      Stop Camera
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setCameraActive(true)}
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 py-8 text-sm font-bold text-indigo-200 mb-6 transition"
+                  >
+                    <Icon name="sparkles" size={24} className="animate-pulse text-indigo-400" />
+                    Scan QR Code (Use Camera)
+                  </button>
+                )}
+
+                {/* Manual Code Form */}
+                <div className="border-t border-white/5 pt-6 mb-6">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                    Backup Verification Code
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={manualCodeInput}
+                      onChange={(e) => setManualCodeInput(e.target.value.toUpperCase())}
+                      placeholder="e.g. A3F89E"
+                      className="flex-1 rounded-2xl border border-white/10 bg-slate-950/40 py-3 px-4 text-center text-sm font-bold tracking-widest text-white uppercase outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/25"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!manualCodeInput.trim()) {
+                          push('Please enter the 6-character backup code.', 'warn');
+                          return;
+                        }
+                        setModal({ type: 'sessionLen', seat: modal.seat, qrToken: manualCodeInput.trim() });
+                        setManualCodeInput('');
+                      }}
+                      className="rounded-2xl bg-indigo-500/25 hover:bg-indigo-500/35 px-6 font-bold text-indigo-100 border border-indigo-400/30 transition"
+                    >
+                      Verify
+                    </button>
+                  </div>
+                </div>
+
+                {/* Developer Simulation Tool */}
+                <div className="border-t border-white/5 pt-6 flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const data = await api('/me/reservation-qr-token');
+                        setModal({ type: 'sessionLen', seat: modal.seat, qrToken: data.qrToken });
+                        push('Dev Tool: Simulated QR scan verified successfully!', 'success');
+                      } catch (e) {
+                        push(e.message || 'Simulation failed.', 'error');
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 rounded-2xl bg-white/[0.04] border border-dashed border-white/15 py-3 text-xs font-bold text-slate-400 hover:bg-white/[0.08] hover:text-slate-300 transition"
+                  >
+                    <Icon name="check-circle" size={14} className="text-emerald-500" />
+                    Simulate QR Scan (Developer Bypass)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      releaseSeat('checkout');
+                    }}
+                    className="w-full text-center text-xs font-medium uppercase tracking-wider text-slate-500 hover:text-slate-300 transition"
+                  >
+                    Cancel Reservation
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* QR Direct Reserve Modal */}
+          {modal && modal.type === 'qrDirectReserve' && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md animate__animated animate__fadeIn" role="dialog" aria-modal="true">
+              <div className="glass-panel w-full max-w-md rounded-3xl p-8 shadow-glass animate__animated animate__zoomIn">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold text-white">Direct Check-in</h3>
+                  <button type="button" onClick={() => setModal(null)} className="text-slate-400 hover:text-white transition">
+                    <Icon name="x-circle" size={24} />
+                  </button>
+                </div>
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/20 text-indigo-200">
+                  <Icon name="sparkles" size={28} />
+                </div>
+                <h3 className="text-center text-lg font-bold text-white">Reserve & Check In</h3>
+                <p className="mt-2 text-center text-sm text-slate-400">
+                  You scanned Seat #{modal.seat.num} in {LIBRARIES.find(l => l.id === modal.seat.libId)?.name || 'Library'}. Would you like to reserve and check in to this seat now?
+                </p>
+                <div className="mt-8 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setModal(null)}
+                    className="flex-1 rounded-2xl border border-white/10 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/5"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDirectReserveAndCheckIn(modal.seat, modal.qrToken)}
+                    className="flex-1 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 py-3 text-sm font-bold text-white shadow-lg hover:brightness-110"
+                  >
+                    Reserve & Check In
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Session length picker after reserve or direct */}
           {modal && modal.type === 'sessionLen' && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md animate__animated animate__fadeIn" role="dialog" aria-modal="true">
@@ -1312,7 +1629,7 @@
                     <button
                       key={m}
                       type="button"
-                      onClick={() => confirmCheckIn(m)}
+                      onClick={() => confirmCheckIn(m, modal.qrToken)}
                       className="rounded-2xl border border-white/10 bg-white/5 py-4 text-sm font-bold text-white transition hover:border-indigo-400/50 hover:bg-indigo-500/20"
                     >
                       {m} min

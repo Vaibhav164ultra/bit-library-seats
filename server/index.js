@@ -14,6 +14,7 @@ import {
   reserveSeat,
   revokeToken,
   validateToken,
+  getSeatsWithTokens,
 } from './store.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -124,16 +125,16 @@ app.post('/api/actions/reserve', auth, (req, res) => {
 app.post('/api/actions/checkin', auth, (req, res) => {
   try {
     const { userId, name } = req.auth;
-    const { libraryId, seatId, minutes } = req.body || {};
+    const { libraryId, seatId, minutes, qrToken } = req.body || {};
     const mins = Number(minutes);
     if (!libraryId || !seatId || !Number.isFinite(mins) || mins < 1 || mins > 480) {
       res.status(400).json({ error: 'libraryId, seatId, and minutes (1–480) are required.' });
       return;
     }
-    const payload = checkInSeat(userId, name, libraryId, seatId, mins);
+    const payload = checkInSeat(userId, name, libraryId, seatId, mins, qrToken);
     res.json({ user: { id: userId, name }, ...payload });
   } catch (e) {
-    const status = e.code === 'FORBIDDEN' ? 403 : e.code === 'NOT_FOUND' ? 404 : 400;
+    const status = e.code === 'FORBIDDEN' ? 403 : e.code === 'NOT_FOUND' ? 404 : e.code === 'INVALID_QR' ? 400 : 400;
     res.status(status).json({ error: e.message, code: e.code });
   }
 });
@@ -151,6 +152,39 @@ app.post('/api/actions/checkout', auth, (req, res) => {
   } catch (e) {
     const status = e.code === 'FORBIDDEN' ? 403 : e.code === 'NOT_FOUND' ? 404 : 400;
     res.status(status).json({ error: e.message, code: e.code });
+  }
+});
+
+app.get('/api/admin/qr-codes', (_req, res) => {
+  try {
+    res.json({ seats: getSeatsWithTokens() });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/me/reservation-qr-token', auth, (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const sess = getSessionForUser(userId);
+    if (!sess || !sess.reservationUntil) {
+      res.status(400).json({ error: 'You do not have a pending reservation.', code: 'NO_RESERVATION' });
+      return;
+    }
+    
+    // Find the seat and get its token
+    const allSeats = getSeatsWithTokens();
+    const libSeats = allSeats[sess.libId] || [];
+    const seat = libSeats.find((s) => s.id === sess.seatId);
+    
+    if (!seat) {
+      res.status(404).json({ error: 'Seat not found.', code: 'NOT_FOUND' });
+      return;
+    }
+    
+    res.json({ qrToken: seat.qrToken });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
