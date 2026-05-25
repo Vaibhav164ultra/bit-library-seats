@@ -166,7 +166,7 @@
     async function api(path, options = {}) {
       const url = `${String(API_ROOT).replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
       const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
-      const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('bit_token') : null;
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('bit_token') : null;
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(url, { ...options, headers });
       let data = {};
@@ -522,11 +522,11 @@
       }, [session]);
 
       const processPendingCheckin = useCallback((currentSession, currentSeats) => {
-        const pendingStr = sessionStorage.getItem('bit_pending_checkin');
+        const pendingStr = localStorage.getItem('bit_pending_checkin');
         if (!pendingStr) return;
         try {
           const pending = JSON.parse(pendingStr);
-          sessionStorage.removeItem('bit_pending_checkin'); // Consume it
+          localStorage.removeItem('bit_pending_checkin'); // Consume it
 
           // Find the library for this seat
           let foundLib = null;
@@ -604,7 +604,7 @@
         const checkinSeatId = params.get('checkinSeatId');
         const qrToken = params.get('qrToken');
         if (checkinSeatId && qrToken) {
-          sessionStorage.setItem('bit_pending_checkin', JSON.stringify({ seatId: checkinSeatId, qrToken }));
+          localStorage.setItem('bit_pending_checkin', JSON.stringify({ seatId: checkinSeatId, qrToken }));
           // Clean URL
           const newUrl = window.location.pathname;
           window.history.replaceState({}, document.title, newUrl);
@@ -730,7 +730,7 @@
 
       /** Restore session from token, or show login */
       useEffect(() => {
-        const t = sessionStorage.getItem('bit_token');
+        const t = localStorage.getItem('bit_token');
         if (!t) {
           setBooting(false);
           return undefined;
@@ -750,7 +750,7 @@
               processPendingCheckin(data.session, data.seats || {});
             }, 100);
           } catch {
-            sessionStorage.removeItem('bit_token');
+            localStorage.removeItem('bit_token');
           } finally {
             if (!cancelled) setBooting(false);
           }
@@ -854,7 +854,7 @@
             method: 'POST',
             body: JSON.stringify({ studentId: id }),
           });
-          sessionStorage.setItem('bit_token', data.token);
+          localStorage.setItem('bit_token', data.token);
           setUser(data.user);
           setSeats(data.seats || {});
           setSession(data.session ?? null);
@@ -891,7 +891,7 @@
             /* ignore */
           }
         } finally {
-          sessionStorage.removeItem('bit_token');
+          localStorage.removeItem('bit_token');
           setUser(null);
           setSession(null);
           setSeats({});
