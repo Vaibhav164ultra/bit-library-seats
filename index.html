@@ -108,6 +108,9 @@
       transform: translateY(-4px);
       box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(129, 140, 248, 0.25);
     }
+    .bottom-session-bar {
+      bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
   </style>
 </head>
 <body>
@@ -1682,20 +1685,20 @@
 
           {/* Bottom session bar */}
           {user && session && mineSeat && (
-            <div className="fixed bottom-4 left-1/2 z-30 w-[94%] max-w-lg -translate-x-1/2 animate__animated animate__slideInUp">
-              <div className="glass-panel flex items-center justify-between gap-4 rounded-3xl border-indigo-500/30 bg-indigo-950/40 p-4 shadow-glass">
+            <div className="bottom-session-bar fixed left-1/2 z-30 w-[94%] max-w-lg -translate-x-1/2 animate__animated animate__slideInUp">
+              <div className="glass-panel flex items-center justify-between gap-2.5 sm:gap-4 rounded-3xl border-indigo-500/30 bg-indigo-950/40 p-3 sm:p-4 shadow-glass">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/30 text-indigo-100">
-                    <Icon name="clock" />
+                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/30 text-indigo-100">
+                    <Icon name="clock" size={20} className="sm:scale-100 scale-90" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+                    <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-indigo-300">
                       {mineSeat.sessionUntil ? 'Session ends in' : 'Reservation ends in'}
                     </p>
-                    <p className="truncate text-lg font-bold tabular-nums text-white">
+                    <p className="truncate text-base sm:text-lg font-bold tabular-nums text-white">
                       {mineSeat.sessionUntil ? formatClock(sessionRemaining) : formatClock(reservationRemaining)}
                     </p>
-                    <p className="truncate text-xs text-slate-400">
+                    <p className="truncate text-[10px] sm:text-xs text-slate-400">
                       {LIBRARIES.find((l) => l.id === session.libId)?.name} · Seat {mineSeat.num}
                     </p>
                   </div>
@@ -1703,7 +1706,7 @@
                 <button
                   type="button"
                   onClick={() => releaseSeat('checkout')}
-                  className="shrink-0 rounded-2xl bg-rose-500/90 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-rose-500"
+                  className="shrink-0 rounded-2xl bg-rose-500/90 px-3.5 py-2 sm:px-5 sm:py-2.5 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-rose-500 active:scale-[0.98]"
                 >
                   Check out
                 </button>
