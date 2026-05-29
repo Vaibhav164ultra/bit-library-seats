@@ -84,6 +84,9 @@ export function getSeatsWithTokens() {
 }
 
 function seatDerivedStatus(seat, now, myUserId) {
+  if (seat.isMaintenance) {
+    return 'maintenance';
+  }
   if (seat.sessionUntil && seat.sessionUntil > now) {
     return seat.holderId === myUserId ? 'mine_occupied' : 'occupied';
   }
@@ -209,14 +212,14 @@ export function checkInSeat(userId, userName, libraryId, seatId, minutes, qrToke
   return getStatePayload(userId);
 }
 
-export function checkoutSeat(userId, libraryId, seatId) {
+export function checkoutSeat(userId, libraryId, seatId, isAdminBypass = false) {
   const seat = findSeat(libraryId, seatId);
   if (!seat) {
     const err = new Error('Seat not found.');
     err.code = 'NOT_FOUND';
     throw err;
   }
-  if (seat.holderId !== userId) {
+  if (!isAdminBypass && seat.holderId !== userId) {
     const err = new Error('You do not occupy this seat.');
     err.code = 'FORBIDDEN';
     throw err;
@@ -228,6 +231,40 @@ export function checkoutSeat(userId, libraryId, seatId) {
   seat.lastActivityAt = null;
   persist();
   return getStatePayload(userId);
+}
+
+export function toggleSeatMaintenance(libraryId, seatId) {
+  const seat = findSeat(libraryId, seatId);
+  if (!seat) {
+    const err = new Error('Seat not found.');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+  // Clear any existing active session/reservation
+  seat.holderId = null;
+  seat.holderName = null;
+  seat.reservationUntil = null;
+  seat.sessionUntil = null;
+  seat.lastActivityAt = null;
+  
+  seat.isMaintenance = !seat.isMaintenance;
+  persist();
+  return cloneSeats();
+}
+
+export function releaseAllSeats() {
+  Object.keys(seats).forEach((libId) => {
+    const list = seats[libId] || [];
+    list.forEach((seat) => {
+      seat.holderId = null;
+      seat.holderName = null;
+      seat.reservationUntil = null;
+      seat.sessionUntil = null;
+      seat.lastActivityAt = null;
+    });
+  });
+  persist();
+  return cloneSeats();
 }
 
 let lastBumpPersist = 0;

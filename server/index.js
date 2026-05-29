@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
-import { ALLOWED_STUDENT_IDS, LIBRARIES, isStudentIdAllowed, isAdmin } from './config.js';
+import { ALLOWED_STUDENT_IDS, LIBRARIES, isStudentIdAllowed, isAdmin, addStudentIdToAllowlist } from './config.js';
 import {
   bumpActivity,
   checkInSeat,
@@ -15,6 +15,8 @@ import {
   revokeToken,
   validateToken,
   getSeatsWithTokens,
+  toggleSeatMaintenance,
+  releaseAllSeats,
 } from './store.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -175,14 +177,14 @@ app.post('/api/actions/checkin', auth, (req, res) => {
 
 app.post('/api/actions/checkout', auth, (req, res) => {
   try {
-    const { userId, name } = req.auth;
+    const { userId, name, role } = req.auth;
     const { libraryId, seatId } = req.body || {};
     if (!libraryId || !seatId) {
       res.status(400).json({ error: 'libraryId and seatId are required.' });
       return;
     }
-    const payload = checkoutSeat(userId, libraryId, seatId);
-    res.json({ user: { id: userId, name }, ...payload });
+    const payload = checkoutSeat(userId, libraryId, seatId, role === 'admin');
+    res.json({ user: { id: userId, name, role }, ...payload });
   } catch (e) {
     const status = e.code === 'FORBIDDEN' ? 403 : e.code === 'NOT_FOUND' ? 404 : 400;
     res.status(status).json({ error: e.message, code: e.code });
@@ -192,6 +194,43 @@ app.post('/api/actions/checkout', auth, (req, res) => {
 app.get('/api/admin/qr-codes', auth, adminOnly, (_req, res) => {
   try {
     res.json({ seats: getSeatsWithTokens() });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/seats/maintenance', auth, adminOnly, (req, res) => {
+  try {
+    const { libraryId, seatId } = req.body || {};
+    if (!libraryId || !seatId) {
+      res.status(400).json({ error: 'libraryId and seatId are required.' });
+      return;
+    }
+    const seats = toggleSeatMaintenance(libraryId, seatId);
+    res.json({ ok: true, seats });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/allowlist', auth, adminOnly, (req, res) => {
+  try {
+    const { studentId } = req.body || {};
+    if (!studentId) {
+      res.status(400).json({ error: 'studentId is required.' });
+      return;
+    }
+    const added = addStudentIdToAllowlist(studentId);
+    res.json({ ok: true, added, allowlist: ALLOWED_STUDENT_IDS });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/actions/release-all', auth, adminOnly, (_req, res) => {
+  try {
+    const seats = releaseAllSeats();
+    res.json({ ok: true, seats });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

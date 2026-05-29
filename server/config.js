@@ -68,3 +68,12 @@ export const TIMING = {
   RESERVATION_MS: 10 * 60 * 1000,
   MOCK_TICKLE_MS: 5000,
 };
+
+export function addStudentIdToAllowlist(studentId) {
+  const id = String(studentId ?? '').trim();
+  if (id && !isStudentIdAllowed(id)) {
+    ALLOWED_STUDENT_IDS.push(id);
+    return true;
+  }
+  return false;
+}

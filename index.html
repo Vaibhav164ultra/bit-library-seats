@@ -425,6 +425,29 @@
               <path d="M12 21v-1" />
             </svg>
           );
+        case 'wrench':
+          return (
+            <svg {...s}>
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+            </svg>
+          );
+        case 'plus-circle':
+          return (
+            <svg {...s}>
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="16" />
+              <line x1="8" y1="12" x2="16" y2="12" />
+            </svg>
+          );
+        case 'trash':
+          return (
+            <svg {...s}>
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+          );
         default:
           return (
             <svg {...s}>
@@ -482,6 +505,9 @@
 
     /** Active session always wins over a hold timer */
     function seatDerivedStatus(seat, now, myUserId, graceSeatId) {
+      if (seat.isMaintenance) {
+        return 'maintenance';
+      }
       if (seat.sessionUntil && seat.sessionUntil > now) {
         const left = seat.sessionUntil - now;
         const mine = myUserId && seat.holderId === myUserId;
@@ -568,6 +594,7 @@
       const [loginTab, setLoginTab] = useState('student'); /* student | admin */
       const [adminUserInput, setAdminUserInput] = useState('');
       const [adminPassInput, setAdminPassInput] = useState('');
+      const [newStudentIdInput, setNewStudentIdInput] = useState('');
 
       /** Active session owned by current user (single session enforced) */
       const [session, setSession] = useState(null);
@@ -1500,6 +1527,9 @@
                     <span className="inline-flex items-center gap-2 rounded-full bg-amber-500/15 px-3 py-1.5 font-medium text-amber-200 ring-1 ring-amber-500/30">
                       <span className="h-2 w-2 rounded-sm bg-amber-400" /> Reserved / expiring
                     </span>
+                    <span className="inline-flex items-center gap-2 rounded-full bg-red-500/15 px-3 py-1.5 font-medium text-red-200 ring-1 ring-red-500/30">
+                      <span className="h-2 w-2 rounded-sm bg-red-400" /> Under Maintenance
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1517,7 +1547,7 @@
                     const mineReserved = session && session.seatId === seat.id && session.reservationUntil && !session.sessionUntil;
                     const mineOccupied = session && session.seatId === seat.id && session.sessionUntil;
                     const disabled =
-                      (st === 'occupied' || st === 'expiring' || st === 'reserved_other') &&
+                      (st === 'occupied' || st === 'expiring' || st === 'reserved_other' || st === 'maintenance') &&
                       !(mineOccupied || mineReserved);
                     const timerMs =
                       mineReserved && seat.reservationUntil
@@ -1534,6 +1564,7 @@
                     else if (st === 'reserved' || st === 'reserved_other')
                       btnClass += 'border-amber-500/40 bg-amber-500/10 text-amber-100 ';
                     else if (st === 'expiring') btnClass += 'border-amber-400/60 bg-gradient-to-b from-amber-500/20 to-orange-600/10 text-amber-50 ';
+                    else if (st === 'maintenance') btnClass += 'border-red-500/30 bg-red-950/20 text-red-300 ';
                     else btnClass += 'border-white/5 bg-slate-800/40 text-slate-200 ';
 
                     if (disabled) btnClass += 'cursor-not-allowed opacity-40 hover:scale-100 ';
@@ -1566,6 +1597,11 @@
                           <span className="tabular-nums text-sm font-bold text-white">{formatDuration(timerMs)}</span>
                         )}
                         {st === 'available' && <span className="text-[10px] font-medium text-slate-500">Open</span>}
+                        {st === 'maintenance' && (
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-red-400 uppercase tracking-wider">
+                            <Icon name="wrench" size={10} /> Locked
+                          </span>
+                        )}
                         {mineOccupied && <Icon name="user-check" size={16} className="text-indigo-200" />}
                         {mineReserved && <Icon name="timer" size={16} className="text-amber-200" />}
                       </button>
@@ -1602,9 +1638,55 @@
             });
             const st = await api('/state');
             setSeats(st.seats || {});
-            push(`${type === 'session' ? 'Session ended' : 'Reservation cancelled'} for seat successfully.`, 'success');
+            push(`${type === 'session' ? 'Session ended' : 'Reservation cancelled'} for Seat ${seatId.split('-')[1]} successfully.`, 'success');
           } catch (e) {
             push(e.message || 'Failed to release seat.', 'error');
+          }
+        };
+
+        const toggleMaintenance = async (libId, seatId) => {
+          try {
+            const data = await api('/admin/seats/maintenance', {
+              method: 'POST',
+              body: JSON.stringify({ libraryId: libId, seatId }),
+            });
+            setSeats(data.seats || {});
+            push(`Seat ${seatId.split('-')[1]} maintenance mode toggled.`, 'success');
+          } catch (e) {
+            push(e.message || 'Failed to toggle maintenance mode.', 'error');
+          }
+        };
+
+        const emergencyReleaseAll = async () => {
+          if (!confirm("Are you sure you want to end all active student sessions and cancel all reservations campus-wide? This action is immediate.")) return;
+          try {
+            const data = await api('/admin/actions/release-all', { method: 'POST' });
+            setSeats(data.seats || {});
+            push("All seats released successfully. Benches are now completely vacant.", "success");
+          } catch (e) {
+            push(e.message || "Failed to release seats.", "error");
+          }
+        };
+
+        const addStudent = async () => {
+          const id = (newStudentIdInput || '').trim();
+          if (!id) {
+            push("Enter student ID to add.", "warn");
+            return;
+          }
+          try {
+            const data = await api('/admin/allowlist', {
+              method: 'POST',
+              body: JSON.stringify({ studentId: id }),
+            });
+            if (data.added) {
+              push(`Student ID ${id} added to allowlist successfully.`, "success");
+            } else {
+              push(`Student ID ${id} is already in the allowlist.`, "info");
+            }
+            setNewStudentIdInput('');
+          } catch (e) {
+            push(e.message || "Failed to update allowlist.", "error");
           }
         };
 
@@ -1615,20 +1697,28 @@
 
             <header className="relative mb-8 space-y-6">
               <div className="glass-panel admin-hero-strip rounded-3xl border border-white/10 p-6 sm:p-8">
-                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-300">Admin Console</p>
-                    <h2 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">System Control</h2>
-                    <p className="mt-2 text-sm text-slate-400">Manage real-time campus seats, view occupant details, and enforce usage policies.</p>
+                    <h2 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">System Control Panel</h2>
+                    <p className="mt-2 text-sm text-slate-400">Manage real-time campus seats, view occupant details, modify dynamic allowlists, and enforce usage policies.</p>
                   </div>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-3 shrink-0">
+                    <button
+                      type="button"
+                      onClick={emergencyReleaseAll}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500/25 px-5 py-3.5 text-xs font-bold text-rose-300 transition-all"
+                    >
+                      <Icon name="trash" size={16} />
+                      Emergency Vacate All Benches
+                    </button>
                     <a
                       href="/print-qrs.html"
                       target="_blank"
-                      className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-pink-500 to-fuchsia-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-pink-900/30 hover:brightness-110 active:scale-[0.98] transition-all"
+                      className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-pink-500 to-fuchsia-600 px-5 py-3.5 text-xs font-bold text-white shadow-lg shadow-pink-900/30 hover:brightness-110 active:scale-[0.98] transition-all"
                     >
-                      <Icon name="printer" size={18} />
-                      Print All QR Codes
+                      <Icon name="printer" size={16} />
+                      Print Bench QR Codes
                     </a>
                   </div>
                 </div>
@@ -1636,47 +1726,46 @@
 
               {/* Campus metrics */}
               <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-                <div className="glass-panel rounded-2xl p-5 border border-white/5">
+                <div className="glass-panel rounded-2xl p-5 border border-white/5 bg-slate-900/20">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Active Sessions</p>
-                  <p className="mt-2 text-3xl font-extrabold text-white">{activeSessions.length}</p>
+                  <p className="mt-2 text-3xl font-extrabold text-white tabular-nums">{activeSessions.length}</p>
                   <p className="mt-1 text-xs text-slate-500">Currently studying</p>
                 </div>
-                <div className="glass-panel rounded-2xl p-5 border border-white/5">
+                <div className="glass-panel rounded-2xl p-5 border border-white/5 bg-slate-900/20">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active Reservations</p>
-                  <p className="mt-2 text-3xl font-extrabold text-amber-300">{activeReservations.length}</p>
+                  <p className="mt-2 text-3xl font-extrabold text-amber-300 tabular-nums">{activeReservations.length}</p>
                   <p className="mt-1 text-xs text-slate-500">Awaiting arrival</p>
                 </div>
-                <div className="glass-panel rounded-2xl p-5 border border-white/5">
+                <div className="glass-panel rounded-2xl p-5 border border-white/5 bg-slate-900/20">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Campus Seats</p>
-                  <p className="mt-2 text-3xl font-extrabold text-indigo-300">{campusOverview.totalSeats}</p>
+                  <p className="mt-2 text-3xl font-extrabold text-indigo-300 tabular-nums">{campusOverview.totalSeats}</p>
                   <p className="mt-1 text-xs text-slate-500">Across 3 libraries</p>
                 </div>
-                <div className="glass-panel rounded-2xl p-5 border border-white/5">
+                <div className="glass-panel rounded-2xl p-5 border border-white/5 bg-slate-900/20">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Available</p>
-                  <p className="mt-2 text-3xl font-extrabold text-emerald-400">{campusOverview.available}</p>
-                  <p className="mt-1 text-xs text-slate-500">{campusOverview.freePct}% available</p>
+                  <p className="mt-2 text-3xl font-extrabold text-emerald-400 tabular-nums">{campusOverview.available}</p>
+                  <p className="mt-1 text-xs text-slate-500">{campusOverview.freePct}% vacant</p>
                 </div>
               </div>
             </header>
 
-            <div className="grid gap-8 lg:grid-cols-2">
+            <div className="grid gap-8 lg:grid-cols-3">
               
               {/* Active Sessions Panel */}
-              <div className="glass-panel rounded-3xl p-6 border border-white/10">
+              <div className="glass-panel rounded-3xl p-6 border border-white/10 lg:col-span-1">
                 <div className="mb-6 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">
                       <Icon name="users" size={16} />
                     </span>
-                    <h3 className="text-lg font-bold text-white">Active Sessions ({activeSessions.length})</h3>
+                    <h3 className="text-base font-bold text-white">Active Sessions ({activeSessions.length})</h3>
                   </div>
                 </div>
 
                 {!activeSessions.length ? (
                   <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/5 py-12 text-center bg-black/10">
-                    <Icon name="users" size={32} className="text-slate-600" />
-                    <p className="mt-2 text-sm font-semibold text-slate-400">No active sessions</p>
-                    <p className="text-xs text-slate-500">When students check in, they will appear here.</p>
+                    <Icon name="users" size={30} className="text-slate-600" />
+                    <p className="mt-2 text-xs font-semibold text-slate-400">No active student check-ins</p>
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
@@ -1686,23 +1775,23 @@
                         <div key={s.id} className="admin-card rounded-2xl p-4 flex items-center justify-between gap-4 transition hover:bg-white/[0.05]">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-white">Seat #{s.num}</span>
-                              <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                              <span className="text-xs font-bold text-white">Seat #{s.num}</span>
+                              <span className="rounded-full bg-slate-850 px-1.5 py-0.5 text-[9px] font-medium text-slate-400">
                                 {s.libraryName}
                               </span>
                             </div>
-                            <p className="mt-1 text-xs text-slate-400">
-                              Student: <span className="font-mono text-slate-300 font-bold">{s.holderId}</span> ({s.holderName})
+                            <p className="mt-1 text-xs text-slate-300 truncate">
+                              ID: <span className="font-mono text-indigo-300 font-bold">{s.holderId}</span>
                             </p>
-                            <p className="mt-0.5 text-[11px] text-slate-500 flex items-center gap-1">
-                              <Icon name="clock" size={11} />
-                              Remaining: <span className="font-semibold text-indigo-300 tabular-nums">{formatDuration(remain)}</span>
+                            <p className="mt-0.5 text-[10px] text-slate-500 flex items-center gap-1">
+                              <Icon name="clock" size={10} />
+                              <span className="font-semibold text-indigo-300 tabular-nums">{formatDuration(remain)}</span> left
                             </p>
                           </div>
                           <button
                             type="button"
                             onClick={() => forceRelease(s.libId, s.id, 'session')}
-                            className="shrink-0 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 hover:text-white px-3.5 py-2 text-xs font-semibold transition"
+                            className="shrink-0 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 hover:text-white px-3 py-1.5 text-xs font-semibold transition"
                           >
                             Release
                           </button>
@@ -1714,21 +1803,20 @@
               </div>
 
               {/* Pending Reservations Panel */}
-              <div className="glass-panel rounded-3xl p-6 border border-white/10">
+              <div className="glass-panel rounded-3xl p-6 border border-white/10 lg:col-span-1">
                 <div className="mb-6 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">
                       <Icon name="timer" size={16} />
                     </span>
-                    <h3 className="text-lg font-bold text-white">Pending Reservations ({activeReservations.length})</h3>
+                    <h3 className="text-base font-bold text-white">Pending Reservations ({activeReservations.length})</h3>
                   </div>
                 </div>
 
                 {!activeReservations.length ? (
                   <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/5 py-12 text-center bg-black/10">
-                    <Icon name="timer" size={32} className="text-slate-600" />
-                    <p className="mt-2 text-sm font-semibold text-slate-400">No pending reservations</p>
-                    <p className="text-xs text-slate-500">Student pre-bookings awaiting check-in.</p>
+                    <Icon name="timer" size={30} className="text-slate-600" />
+                    <p className="mt-2 text-xs font-semibold text-slate-400">No active student holds</p>
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
@@ -1738,25 +1826,25 @@
                         <div key={r.id} className="admin-card rounded-2xl p-4 flex items-center justify-between gap-4 transition hover:bg-white/[0.05]">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-white">Seat #{r.num}</span>
-                              <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                              <span className="text-xs font-bold text-white">Seat #{r.num}</span>
+                              <span className="rounded-full bg-slate-850 px-1.5 py-0.5 text-[9px] font-medium text-slate-400">
                                 {r.libraryName}
                               </span>
                             </div>
-                            <p className="mt-1 text-xs text-slate-400">
-                              Student: <span className="font-mono text-slate-300 font-bold">{r.holderId}</span> ({r.holderName})
+                            <p className="mt-1 text-xs text-slate-300 truncate">
+                              ID: <span className="font-mono text-amber-300 font-bold">{r.holderId}</span>
                             </p>
-                            <p className="mt-0.5 text-[11px] text-slate-500 flex items-center gap-1">
-                              <Icon name="clock" size={11} />
-                              Expires in: <span className="font-semibold text-amber-300 tabular-nums">{formatDuration(remain)}</span>
+                            <p className="mt-0.5 text-[10px] text-slate-500 flex items-center gap-1">
+                              <Icon name="clock" size={10} />
+                              Expires: <span className="font-semibold text-amber-300 tabular-nums">{formatDuration(remain)}</span>
                             </p>
                           </div>
                           <button
                             type="button"
                             onClick={() => forceRelease(r.libId, r.id, 'reservation')}
-                            className="shrink-0 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 hover:text-white px-3.5 py-2 text-xs font-semibold transition"
+                            className="shrink-0 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 hover:text-white px-3 py-1.5 text-xs font-semibold transition"
                           >
-                            Release
+                            Cancel
                           </button>
                         </div>
                       );
@@ -1765,12 +1853,64 @@
                 )}
               </div>
 
+              {/* Allowlist Manager Panel */}
+              <div className="glass-panel rounded-3xl p-6 border border-white/10 lg:col-span-1">
+                <div className="mb-6 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-pink-500/10 text-pink-400 ring-1 ring-pink-500/20">
+                      <Icon name="plus-circle" size={16} />
+                    </span>
+                    <h3 className="text-base font-bold text-white">Temporary Allowlist Manager</h3>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-xs leading-relaxed text-slate-400">
+                    Authorize a new student ID on the fly. This bypasses editing file configurations and immediately registers the ID in memory.
+                  </p>
+                  
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5" htmlFor="new-student-id">
+                      New Student ID
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        id="new-student-id"
+                        type="text"
+                        value={newStudentIdInput}
+                        onChange={(e) => setNewStudentIdInput(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => e.key === 'Enter' && addStudent()}
+                        placeholder="e.g. 1BI25CS999"
+                        className="flex-1 rounded-xl border border-white/10 bg-slate-950/40 py-2.5 px-3 text-sm text-white font-medium outline-none transition focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/20 placeholder:text-slate-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={addStudent}
+                        className="rounded-xl bg-pink-500/20 hover:bg-pink-500/30 px-4 font-bold text-pink-200 border border-pink-400/25 transition active:scale-[0.98]"
+                      >
+                        Authorize
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/5 pt-4">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Allowlist Guide</p>
+                    <div className="rounded-xl bg-white/[0.02] p-3 text-[11px] text-slate-400 border border-white/5 space-y-1.5">
+                      <p>Currently configured default allowlist from backend:</p>
+                      <code className="block rounded bg-black/40 p-1.5 font-mono text-indigo-300 text-center">1BI25AI163, 1BI25AI164, 1BI25AI165</code>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
 
-            {/* Quick Overview of Library Occupancies */}
+            {/* Quick Overview of Library Occupancies & Bench Grid */}
             <div className="glass-panel rounded-3xl p-6 border border-white/10 mt-8">
-              <h3 className="text-lg font-bold text-white mb-6">Library Overview</h3>
-              <div className="grid gap-6 md:grid-cols-3">
+              <h3 className="text-lg font-bold text-white mb-2">Interactive Library Console</h3>
+              <p className="text-xs text-slate-400 mb-6">Click any bench cell in the grid to display quick administrative control options (Release session, or toggle Out-of-Service Maintenance status).</p>
+              
+              <div className="grid gap-6 lg:grid-cols-3">
                 {LIBRARIES.map((lib) => {
                   const list = seats[lib.id] || [];
                   const occ = list.filter((s) => s.sessionUntil && s.sessionUntil > now).length;
@@ -1778,33 +1918,98 @@
                   const total = lib.total;
                   const avail = list.filter((s) => seatDerivedStatus(s, now, null, null) === 'available').length;
                   const pct = total ? Math.round((occ / total) * 100) : 0;
+                  
                   return (
-                    <div key={lib.id} className="admin-card rounded-2xl p-5 border border-white/5 relative overflow-hidden">
-                      <h4 className="font-bold text-white text-base">{lib.name}</h4>
-                      <p className="text-xs text-slate-400 mt-0.5">{lib.subtitle}</p>
-                      
-                      <div className="mt-6 grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-white/[0.02] border border-white/5 rounded-xl py-2 px-1">
-                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Avail</span>
-                          <span className="text-lg font-extrabold text-emerald-400 block mt-0.5">{avail}</span>
+                    <div key={lib.id} className="admin-card rounded-2xl p-5 border border-white/5 relative overflow-hidden flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-start gap-4">
+                          <div>
+                            <h4 className="font-bold text-white text-base">{lib.name}</h4>
+                            <p className="text-xs text-slate-400 mt-0.5">{lib.subtitle}</p>
+                          </div>
+                          <span className="rounded-full bg-slate-800/80 px-2 py-0.5 text-[10px] font-bold text-slate-400 border border-white/5">
+                            {total} Seats
+                          </span>
                         </div>
-                        <div className="bg-white/[0.02] border border-white/5 rounded-xl py-2 px-1">
-                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">In Use</span>
-                          <span className="text-lg font-extrabold text-indigo-300 block mt-0.5">{occ}</span>
+                        
+                        <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs">
+                          <div className="bg-white/[0.01] border border-white/5 rounded-xl py-1.5">
+                            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider block">Vacant</span>
+                            <span className="text-base font-extrabold text-white block mt-0.5">{avail}</span>
+                          </div>
+                          <div className="bg-white/[0.01] border border-white/5 rounded-xl py-1.5">
+                            <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider block">Checked In</span>
+                            <span className="text-base font-extrabold text-white block mt-0.5">{occ}</span>
+                          </div>
+                          <div className="bg-white/[0.01] border border-white/5 rounded-xl py-1.5">
+                            <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider block">Holds</span>
+                            <span className="text-base font-extrabold text-white block mt-0.5">{res}</span>
+                          </div>
                         </div>
-                        <div className="bg-white/[0.02] border border-white/5 rounded-xl py-2 px-1">
-                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Held</span>
-                          <span className="text-lg font-extrabold text-amber-300 block mt-0.5">{res}</span>
+
+                        {/* Interactive mini grid */}
+                        <div className="mt-6 border-t border-white/5 pt-5">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Live Bench Console Grid</span>
+                            <span className="text-[9px] text-slate-600 font-semibold uppercase flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping"></span> Grid map
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-6 gap-2">
+                            {list.map((seat) => {
+                              const st = seatDerivedStatus(seat, now, null, null);
+                              let btnBg = "bg-white/[0.04] text-slate-400 border border-white/5 hover:border-indigo-400/40 hover:bg-indigo-500/10";
+                              if (st === 'occupied' || st === 'expiring') {
+                                btnBg = "bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 hover:border-rose-400 hover:bg-rose-500/10";
+                              } else if (st === 'reserved') {
+                                btnBg = "bg-amber-500/20 text-amber-200 border border-amber-500/30 hover:border-rose-400 hover:bg-rose-500/10";
+                              } else if (st === 'maintenance') {
+                                btnBg = "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-emerald-500/10 hover:border-emerald-500/30";
+                              }
+
+                              const handleCellClick = async () => {
+                                const details = seat.holderId ? `\nOccupied by: ${seat.holderId} (${seat.holderName || "N/A"})` : "";
+                                const promptText = `Bench Seat #${seat.num} Console Options` + 
+                                                   `\nCurrent status: ${st.toUpperCase()}${details}` + 
+                                                   `\n\nChoose command code:` + 
+                                                   `\n1. Toggle Maintenance (Currently: ${st === 'maintenance' ? 'LOCKED' : 'VACANT/IN-USE'})` + 
+                                                   `\n2. Force Vacate/Release Bench (Instantly clear hold/active study)` + 
+                                                   `\n3. Close Action Menu`;
+                                const cmd = prompt(promptText, "1");
+                                if (cmd === "1") {
+                                  await toggleMaintenance(lib.id, seat.id);
+                                } else if (cmd === "2") {
+                                  if (seat.holderId) {
+                                    await forceRelease(lib.id, seat.id, seat.sessionUntil ? 'session' : 'reservation');
+                                  } else {
+                                    push(`Seat #${seat.num} is already unoccupied.`, "warn");
+                                  }
+                                }
+                              };
+
+                              return (
+                                <button
+                                  key={seat.id}
+                                  type="button"
+                                  title={`Seat ${seat.num} (${st.toUpperCase()})`}
+                                  onClick={handleCellClick}
+                                  className={`flex h-8 items-center justify-center rounded-lg text-xs font-bold transition duration-200 active:scale-[0.9] ${btnBg}`}
+                                >
+                                  {st === 'maintenance' ? <Icon name="wrench" size={11} className="text-red-400" /> : seat.num}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="mt-5 space-y-1.5">
-                        <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
-                          <span>Occupancy</span>
+                      <div className="mt-5 space-y-1.5 border-t border-white/5 pt-4">
+                        <div className="flex justify-between text-[9px] font-bold text-slate-500 uppercase">
+                          <span>Occupancy pct</span>
                           <span className="text-slate-400">{pct}%</span>
                         </div>
-                        <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                          <div className={`h-full bg-gradient-to-r ${lib.accent} transition-all`} style={{ width: `${pct}%` }}></div>
+                        <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+                          <div className={`h-full bg-gradient-to-r ${lib.accent} transition-all duration-500`} style={{ width: `${pct}%` }}></div>
                         </div>
                       </div>
                     </div>
