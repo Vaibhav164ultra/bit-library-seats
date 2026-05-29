@@ -111,6 +111,30 @@
     .bottom-session-bar {
       bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
     }
+    .admin-hero-strip {
+      background: linear-gradient(135deg, rgba(236, 72, 153, 0.08) 0%, rgba(255, 255, 255, 0.04) 50%, rgba(168, 85, 247, 0.1) 100%);
+    }
+    .admin-card {
+      background: rgba(255,255,255,0.03);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .login-tab-active {
+      background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.25));
+      border-color: rgba(129,140,248,0.5);
+      color: #fff;
+      box-shadow: 0 0 20px -6px rgba(99,102,241,0.4);
+    }
+    .login-tab-inactive {
+      background: rgba(255,255,255,0.03);
+      border-color: rgba(255,255,255,0.08);
+      color: rgba(148,163,184,1);
+    }
+    .login-tab-inactive:hover {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.15);
+      color: rgba(226,232,240,1);
+    }
   </style>
 </head>
 <body>
@@ -362,6 +386,45 @@
               <path d="M19 3v4M21 5h-4M5 19H3M5 21v-2" />
             </svg>
           );
+        case 'shield':
+          return (
+            <svg {...s}>
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          );
+        case 'key':
+          return (
+            <svg {...s}>
+              <circle cx="7.5" cy="15.5" r="5.5" />
+              <path d="m21 2-9.6 9.6" />
+              <path d="m15.5 7.5 3 3L22 7l-3-3" />
+            </svg>
+          );
+        case 'printer':
+          return (
+            <svg {...s}>
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect width="12" height="8" x="6" y="14" />
+            </svg>
+          );
+        case 'qr-code':
+          return (
+            <svg {...s}>
+              <rect width="5" height="5" x="3" y="3" rx="1" />
+              <rect width="5" height="5" x="16" y="3" rx="1" />
+              <rect width="5" height="5" x="3" y="16" rx="1" />
+              <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
+              <path d="M21 21v.01" />
+              <path d="M12 7v3a2 2 0 0 1-2 2H7" />
+              <path d="M3 12h.01" />
+              <path d="M12 3h.01" />
+              <path d="M12 16v.01" />
+              <path d="M16 12h1" />
+              <path d="M21 12v.01" />
+              <path d="M12 21v-1" />
+            </svg>
+          );
         default:
           return (
             <svg {...s}>
@@ -496,12 +559,15 @@
 
     function App() {
       const [booting, setBooting] = useState(true);
-      const [view, setView] = useState('login'); /* login | dash | map */
+      const [view, setView] = useState('login'); /* login | dash | map | adminDash */
       const [user, setUser] = useState(null);
       const [studentIdInput, setStudentIdInput] = useState('');
       const [selectedLib, setSelectedLib] = useState(null);
       const [seats, setSeats] = useState({});
       const [now, setNow] = useState(Date.now());
+      const [loginTab, setLoginTab] = useState('student'); /* student | admin */
+      const [adminUserInput, setAdminUserInput] = useState('');
+      const [adminPassInput, setAdminPassInput] = useState('');
 
       /** Active session owned by current user (single session enforced) */
       const [session, setSession] = useState(null);

@@ -110,9 +110,9 @@ export function getSessionForUser(userId) {
   return null;
 }
 
-export function createToken(userId, name) {
+export function createToken(userId, name, role = 'student') {
   const token = crypto.randomBytes(24).toString('hex');
-  tokens.set(token, { userId, name, exp: Date.now() + TOKEN_TTL_MS });
+  tokens.set(token, { userId, name, role, exp: Date.now() + TOKEN_TTL_MS });
   return token;
 }
 

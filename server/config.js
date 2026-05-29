@@ -18,6 +18,22 @@ export function isStudentIdAllowed(studentId) {
   return ALLOWED_STUDENT_IDS.some((allowed) => allowed.toLowerCase() === lower);
 }
 
+/**
+ * Admin credentials — only this account can access QR code generation / printing.
+ * Change these values and restart the server to update.
+ */
+export const ADMIN_CREDENTIALS = {
+  username: 'admin',
+  password: 'admin123',
+};
+
+export function isAdmin(username, password) {
+  return (
+    String(username ?? '').trim().toLowerCase() === ADMIN_CREDENTIALS.username.toLowerCase() &&
+    String(password ?? '') === ADMIN_CREDENTIALS.password
+  );
+}
+
 /** Keep in sync with seat layout in public/index.html (LIBRARIES). */
 export const LIBRARIES = [
   {

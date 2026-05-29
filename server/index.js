@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
-import { ALLOWED_STUDENT_IDS, LIBRARIES, isStudentIdAllowed } from './config.js';
+import { ALLOWED_STUDENT_IDS, LIBRARIES, isStudentIdAllowed, isAdmin } from './config.js';
 import {
   bumpActivity,
   checkInSeat,
@@ -38,12 +38,21 @@ function auth(req, res, next) {
     res.status(401).json({ error: 'Invalid or expired session. Sign in again.' });
     return;
   }
-  if (!isStudentIdAllowed(row.userId)) {
+  // Admin tokens bypass student-ID allowlist
+  if (row.role !== 'admin' && !isStudentIdAllowed(row.userId)) {
     revokeToken(token);
     res.status(403).json({ error: 'Incorrect student ID. Access is restricted.', code: 'NOT_ALLOWED' });
     return;
   }
   req.auth = row;
+  next();
+}
+
+function adminOnly(req, res, next) {
+  if (!req.auth || req.auth.role !== 'admin') {
+    res.status(403).json({ error: 'Admin access required.', code: 'ADMIN_ONLY' });
+    return;
+  }
   next();
 }
 
@@ -67,17 +76,42 @@ app.post('/api/auth/login', (req, res) => {
       return;
     }
     const studentId = raw;
-    const token = createToken(studentId, studentId);
+    const token = createToken(studentId, studentId, 'student');
     const seatsOut = cloneSeats();
     const session = getSessionForUser(studentId);
     res.json({
       token,
-      user: { id: studentId, name: studentId },
+      user: { id: studentId, name: studentId, role: 'student' },
       seats: seatsOut,
       session,
     });
   } catch (e) {
     res.status(500).json({ error: e.message || 'Login failed.' });
+  }
+});
+
+app.post('/api/auth/admin-login', (req, res) => {
+  try {
+    const username = String(req.body?.username ?? '').trim();
+    const password = String(req.body?.password ?? '');
+    if (!username || !password) {
+      res.status(400).json({ error: 'Username and password are required.', code: 'MISSING_CREDS' });
+      return;
+    }
+    if (!isAdmin(username, password)) {
+      res.status(403).json({ error: 'Invalid admin credentials.', code: 'INVALID_ADMIN' });
+      return;
+    }
+    const token = createToken('admin', 'Administrator', 'admin');
+    const seatsOut = cloneSeats();
+    res.json({
+      token,
+      user: { id: 'admin', name: 'Administrator', role: 'admin' },
+      seats: seatsOut,
+      session: null,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Admin login failed.' });
   }
 });
 
@@ -89,9 +123,9 @@ app.post('/api/auth/logout', auth, (req, res) => {
 });
 
 app.get('/api/state', auth, (req, res) => {
-  const { userId, name } = req.auth;
+  const { userId, name, role } = req.auth;
   res.json({
-    user: { id: userId, name },
+    user: { id: userId, name, role },
     ...getStatePayload(userId),
   });
 });
@@ -155,7 +189,7 @@ app.post('/api/actions/checkout', auth, (req, res) => {
   }
 });
 
-app.get('/api/admin/qr-codes', (_req, res) => {
+app.get('/api/admin/qr-codes', auth, adminOnly, (_req, res) => {
   try {
     res.json({ seats: getSeatsWithTokens() });
   } catch (e) {
