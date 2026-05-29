@@ -812,7 +812,11 @@
             setUser(data.user);
             setSeats(data.seats || {});
             setSession(data.session ?? null);
-            setView('dash');
+            if (data.user && data.user.role === 'admin') {
+              setView('adminDash');
+            } else {
+              setView('dash');
+            }
             
             // Process pending check-in after state is set
             setTimeout(() => {
@@ -928,7 +932,11 @@
           setSeats(data.seats || {});
           setSession(data.session ?? null);
           setBooting(false);
-          setView('dash');
+          if (data.user && data.user.role === 'admin') {
+            setView('adminDash');
+          } else {
+            setView('dash');
+          }
           push(`Welcome, ${data.user.name}.`, 'success');
           
           setTimeout(() => {
@@ -936,6 +944,30 @@
           }, 100);
         } catch (e) {
           push(e.message || 'Sign-in failed.', 'error');
+        }
+      };
+
+      const adminLogin = async () => {
+        const username = (adminUserInput || '').trim();
+        const password = adminPassInput;
+        if (!username || !password) {
+          push('Enter username and password.', 'warn');
+          return;
+        }
+        try {
+          const data = await api('/auth/admin-login', {
+            method: 'POST',
+            body: JSON.stringify({ username, password }),
+          });
+          localStorage.setItem('bit_token', data.token);
+          setUser(data.user);
+          setSeats(data.seats || {});
+          setSession(data.session ?? null);
+          setBooting(false);
+          setView('adminDash');
+          push(`Welcome, Administrator.`, 'success');
+        } catch (e) {
+          push(e.message || 'Admin sign-in failed.', 'error');
         }
       };
 
@@ -1116,45 +1148,147 @@
 
           <div className="relative z-10 flex flex-1 items-center justify-center px-5 pb-16 pt-4 sm:px-8 lg:pb-12 lg:pt-12">
             <div className="glass-panel login-card-glow w-full max-w-md rounded-[1.75rem] border border-white/10 p-8 sm:rounded-[2rem] sm:p-10">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 p-2.5 shadow-lg shadow-indigo-900/50">
-                  <Icon name="sparkles" size={22} className="text-white" />
+              
+              {/* Tab Selector */}
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-white/[0.03] border border-white/5 mb-6">
+                <button
+                  type="button"
+                  onClick={() => setLoginTab('student')}
+                  className={`flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-xl border transition-all ${
+                    loginTab === 'student'
+                      ? 'login-tab-active'
+                      : 'login-tab-inactive border-transparent bg-transparent'
+                  }`}
+                >
+                  <Icon name="graduation-cap" size={15} />
+                  Student
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoginTab('admin')}
+                  className={`flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-xl border transition-all ${
+                    loginTab === 'admin'
+                      ? 'login-tab-active'
+                      : 'login-tab-inactive border-transparent bg-transparent'
+                  }`}
+                >
+                  <Icon name="shield" size={15} />
+                  Admin
+                </button>
+              </div>
+
+              {loginTab === 'student' ? (
+                <div className="animate__animated animate__fadeIn animate__faster">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 p-2.5 shadow-lg shadow-indigo-900/50">
+                      <Icon name="sparkles" size={22} className="text-white" />
+                    </div>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Student access
+                    </span>
+                  </div>
+                  <h2 className="mt-4 text-2xl font-bold tracking-tight text-white">Sign in to continue</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-400">Enter your student ID — you will stay signed in until you log out.</p>
+
+                  <label className="mt-8 block text-xs font-semibold uppercase tracking-wider text-slate-500" htmlFor="sid">
+                    Student ID
+                  </label>
+                  <div className="relative mt-2">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+                      <Icon name="graduation-cap" size={18} />
+                    </span>
+                    <input
+                      id="sid"
+                      autoComplete="username"
+                      value={studentIdInput}
+                      onChange={(e) => setStudentIdInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && login()}
+                      placeholder="e.g. 1BI21CS000"
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/40 py-3.5 pl-12 pr-4 text-sm font-medium text-white outline-none ring-0 transition placeholder:text-slate-600 focus:border-indigo-400/70 focus:bg-slate-950/60 focus:ring-2 focus:ring-indigo-500/30"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={login}
+                    className="group mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 via-violet-600 to-fuchsia-600 py-4 text-sm font-bold text-white shadow-xl shadow-indigo-950/40 transition hover:brightness-110 active:scale-[0.99]"
+                  >
+                    Enter dashboard
+                    <span className="transition group-hover:translate-x-0.5" aria-hidden>
+                      →
+                    </span>
+                  </button>
+                  
+                  <p className="mt-6 text-center text-[10px] text-slate-600">
+                    Only authorized student IDs in <code className="rounded bg-white/10 px-1 text-slate-400">server/config.js</code> may sign in.
+                  </p>
                 </div>
-                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Student access
-                </span>
-              </div>
-              <h2 className="mt-4 text-2xl font-bold tracking-tight text-white">Sign in to continue</h2>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">Enter your student ID — you will stay signed in until you log out.</p>
+              ) : (
+                <div className="animate__animated animate__fadeIn animate__faster">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-pink-500 to-fuchsia-600 p-2.5 shadow-lg shadow-pink-900/50">
+                      <Icon name="shield" size={22} className="text-white" />
+                    </div>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-pink-400">
+                      Admin access
+                    </span>
+                  </div>
+                  <h2 className="mt-4 text-2xl font-bold tracking-tight text-white">Admin Portal</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-400">Sign in with administrator credentials to manage QR codes & seat rules.</p>
 
-              <label className="mt-8 block text-xs font-semibold uppercase tracking-wider text-slate-500" htmlFor="sid">
-                Student ID
-              </label>
-              <div className="relative mt-2">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
-                  <Icon name="graduation-cap" size={18} />
-                </span>
-                <input
-                  id="sid"
-                  autoComplete="username"
-                  value={studentIdInput}
-                  onChange={(e) => setStudentIdInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && login()}
-                  placeholder="e.g. 1BI21CS000"
-                  className="w-full rounded-2xl border border-white/10 bg-slate-950/40 py-3.5 pl-12 pr-4 text-sm font-medium text-white outline-none ring-0 transition placeholder:text-slate-600 focus:border-indigo-400/70 focus:bg-slate-950/60 focus:ring-2 focus:ring-indigo-500/30"
-                />
-              </div>
+                  <label className="mt-6 block text-xs font-semibold uppercase tracking-wider text-slate-500" htmlFor="admin-user">
+                    Username
+                  </label>
+                  <div className="relative mt-2">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+                      <Icon name="users" size={18} />
+                    </span>
+                    <input
+                      id="admin-user"
+                      autoComplete="username"
+                      value={adminUserInput}
+                      onChange={(e) => setAdminUserInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && adminLogin()}
+                      placeholder="Username"
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/40 py-3.5 pl-12 pr-4 text-sm font-medium text-white outline-none ring-0 transition placeholder:text-slate-600 focus:border-pink-400/70 focus:bg-slate-950/60 focus:ring-2 focus:ring-pink-500/30"
+                    />
+                  </div>
 
-              <button
-                type="button"
-                onClick={login}
-                className="group mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 via-violet-600 to-fuchsia-600 py-4 text-sm font-bold text-white shadow-xl shadow-indigo-950/40 transition hover:brightness-110 active:scale-[0.99]"
-              >
-                Enter dashboard
-                <span className="transition group-hover:translate-x-0.5" aria-hidden>
-                  →
-                </span>
-              </button>
+                  <label className="mt-4 block text-xs font-semibold uppercase tracking-wider text-slate-500" htmlFor="admin-pass">
+                    Password
+                  </label>
+                  <div className="relative mt-2">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+                      <Icon name="key" size={18} />
+                    </span>
+                    <input
+                      id="admin-pass"
+                      type="password"
+                      autoComplete="current-password"
+                      value={adminPassInput}
+                      onChange={(e) => setAdminPassInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && adminLogin()}
+                      placeholder="••••••••"
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/40 py-3.5 pl-12 pr-4 text-sm font-medium text-white outline-none ring-0 transition placeholder:text-slate-600 focus:border-pink-400/70 focus:bg-slate-950/60 focus:ring-2 focus:ring-pink-500/30"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={adminLogin}
+                    className="group mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-600 to-fuchsia-600 py-4 text-sm font-bold text-white shadow-xl shadow-pink-950/40 transition hover:brightness-110 active:scale-[0.99]"
+                  >
+                    Enter Admin Console
+                    <span className="transition group-hover:translate-x-0.5" aria-hidden>
+                      →
+                    </span>
+                  </button>
+                  
+                  <p className="mt-6 text-center text-[10px] text-slate-600">
+                    Use credentials configured in <code className="rounded bg-white/10 px-1 text-slate-400">server/config.js</code>.
+                  </p>
+                </div>
+              )}
 
               <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-white/5 pt-6 text-[11px] text-slate-500">
                 <span className="inline-flex items-center gap-1.5">
@@ -1172,9 +1306,6 @@
                   Open app: http://localhost:3001
                 </a>
               </div>
-              <p className="mt-2 text-center text-[10px] text-slate-600">
-                Only the three student IDs in <code className="rounded bg-white/10 px-1 text-slate-400">server/config.js</code> may sign in. After editing them, stop the server (Ctrl+C) and run <code className="rounded bg-white/10 px-1 text-slate-400">npm start</code> again.
-              </p>
             </div>
           </div>
         </div>
@@ -1447,6 +1578,244 @@
         );
       };
 
+      const renderAdminDash = () => {
+        // Collect all active student sessions/reservations
+        const activeSessions = [];
+        const activeReservations = [];
+
+        LIBRARIES.forEach((lib) => {
+          const list = seats[lib.id] || [];
+          list.forEach((seat) => {
+            if (seat.sessionUntil && seat.sessionUntil > now) {
+              activeSessions.push({ ...seat, libraryName: lib.name, libId: lib.id });
+            } else if (seat.reservationUntil && seat.reservationUntil > now) {
+              activeReservations.push({ ...seat, libraryName: lib.name, libId: lib.id });
+            }
+          });
+        });
+
+        const forceRelease = async (libId, seatId, type) => {
+          try {
+            await api('/actions/checkout', {
+              method: 'POST',
+              body: JSON.stringify({ libraryId: libId, seatId }),
+            });
+            const st = await api('/state');
+            setSeats(st.seats || {});
+            push(`${type === 'session' ? 'Session ended' : 'Reservation cancelled'} for seat successfully.`, 'success');
+          } catch (e) {
+            push(e.message || 'Failed to release seat.', 'error');
+          }
+        };
+
+        return (
+          <div className="view-fade-enter-active relative mx-auto max-w-6xl px-4 pb-32 pt-6 sm:px-6">
+            <div className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full bg-pink-600/10 blur-[100px]" aria-hidden />
+            <div className="pointer-events-none absolute -right-20 top-40 h-64 w-64 rounded-full bg-fuchsia-600/10 blur-[90px]" aria-hidden />
+
+            <header className="relative mb-8 space-y-6">
+              <div className="glass-panel admin-hero-strip rounded-3xl border border-white/10 p-6 sm:p-8">
+                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-300">Admin Console</p>
+                    <h2 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">System Control</h2>
+                    <p className="mt-2 text-sm text-slate-400">Manage real-time campus seats, view occupant details, and enforce usage policies.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <a
+                      href="/print-qrs.html"
+                      target="_blank"
+                      className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-pink-500 to-fuchsia-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-pink-900/30 hover:brightness-110 active:scale-[0.98] transition-all"
+                    >
+                      <Icon name="printer" size={18} />
+                      Print All QR Codes
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Campus metrics */}
+              <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                <div className="glass-panel rounded-2xl p-5 border border-white/5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Active Sessions</p>
+                  <p className="mt-2 text-3xl font-extrabold text-white">{activeSessions.length}</p>
+                  <p className="mt-1 text-xs text-slate-500">Currently studying</p>
+                </div>
+                <div className="glass-panel rounded-2xl p-5 border border-white/5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active Reservations</p>
+                  <p className="mt-2 text-3xl font-extrabold text-amber-300">{activeReservations.length}</p>
+                  <p className="mt-1 text-xs text-slate-500">Awaiting arrival</p>
+                </div>
+                <div className="glass-panel rounded-2xl p-5 border border-white/5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Campus Seats</p>
+                  <p className="mt-2 text-3xl font-extrabold text-indigo-300">{campusOverview.totalSeats}</p>
+                  <p className="mt-1 text-xs text-slate-500">Across 3 libraries</p>
+                </div>
+                <div className="glass-panel rounded-2xl p-5 border border-white/5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Available</p>
+                  <p className="mt-2 text-3xl font-extrabold text-emerald-400">{campusOverview.available}</p>
+                  <p className="mt-1 text-xs text-slate-500">{campusOverview.freePct}% available</p>
+                </div>
+              </div>
+            </header>
+
+            <div className="grid gap-8 lg:grid-cols-2">
+              
+              {/* Active Sessions Panel */}
+              <div className="glass-panel rounded-3xl p-6 border border-white/10">
+                <div className="mb-6 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">
+                      <Icon name="users" size={16} />
+                    </span>
+                    <h3 className="text-lg font-bold text-white">Active Sessions ({activeSessions.length})</h3>
+                  </div>
+                </div>
+
+                {!activeSessions.length ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/5 py-12 text-center bg-black/10">
+                    <Icon name="users" size={32} className="text-slate-600" />
+                    <p className="mt-2 text-sm font-semibold text-slate-400">No active sessions</p>
+                    <p className="text-xs text-slate-500">When students check in, they will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                    {activeSessions.map((s) => {
+                      const remain = s.sessionUntil ? s.sessionUntil - now : 0;
+                      return (
+                        <div key={s.id} className="admin-card rounded-2xl p-4 flex items-center justify-between gap-4 transition hover:bg-white/[0.05]">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-white">Seat #{s.num}</span>
+                              <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                                {s.libraryName}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-400">
+                              Student: <span className="font-mono text-slate-300 font-bold">{s.holderId}</span> ({s.holderName})
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-slate-500 flex items-center gap-1">
+                              <Icon name="clock" size={11} />
+                              Remaining: <span className="font-semibold text-indigo-300 tabular-nums">{formatDuration(remain)}</span>
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => forceRelease(s.libId, s.id, 'session')}
+                            className="shrink-0 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 hover:text-white px-3.5 py-2 text-xs font-semibold transition"
+                          >
+                            Release
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Pending Reservations Panel */}
+              <div className="glass-panel rounded-3xl p-6 border border-white/10">
+                <div className="mb-6 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20">
+                      <Icon name="timer" size={16} />
+                    </span>
+                    <h3 className="text-lg font-bold text-white">Pending Reservations ({activeReservations.length})</h3>
+                  </div>
+                </div>
+
+                {!activeReservations.length ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/5 py-12 text-center bg-black/10">
+                    <Icon name="timer" size={32} className="text-slate-600" />
+                    <p className="mt-2 text-sm font-semibold text-slate-400">No pending reservations</p>
+                    <p className="text-xs text-slate-500">Student pre-bookings awaiting check-in.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                    {activeReservations.map((r) => {
+                      const remain = r.reservationUntil ? r.reservationUntil - now : 0;
+                      return (
+                        <div key={r.id} className="admin-card rounded-2xl p-4 flex items-center justify-between gap-4 transition hover:bg-white/[0.05]">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-white">Seat #{r.num}</span>
+                              <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                                {r.libraryName}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-400">
+                              Student: <span className="font-mono text-slate-300 font-bold">{r.holderId}</span> ({r.holderName})
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-slate-500 flex items-center gap-1">
+                              <Icon name="clock" size={11} />
+                              Expires in: <span className="font-semibold text-amber-300 tabular-nums">{formatDuration(remain)}</span>
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => forceRelease(r.libId, r.id, 'reservation')}
+                            className="shrink-0 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 hover:text-white px-3.5 py-2 text-xs font-semibold transition"
+                          >
+                            Release
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Quick Overview of Library Occupancies */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 mt-8">
+              <h3 className="text-lg font-bold text-white mb-6">Library Overview</h3>
+              <div className="grid gap-6 md:grid-cols-3">
+                {LIBRARIES.map((lib) => {
+                  const list = seats[lib.id] || [];
+                  const occ = list.filter((s) => s.sessionUntil && s.sessionUntil > now).length;
+                  const res = list.filter((s) => s.reservationUntil && !s.sessionUntil && s.reservationUntil > now).length;
+                  const total = lib.total;
+                  const avail = list.filter((s) => seatDerivedStatus(s, now, null, null) === 'available').length;
+                  const pct = total ? Math.round((occ / total) * 100) : 0;
+                  return (
+                    <div key={lib.id} className="admin-card rounded-2xl p-5 border border-white/5 relative overflow-hidden">
+                      <h4 className="font-bold text-white text-base">{lib.name}</h4>
+                      <p className="text-xs text-slate-400 mt-0.5">{lib.subtitle}</p>
+                      
+                      <div className="mt-6 grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-white/[0.02] border border-white/5 rounded-xl py-2 px-1">
+                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Avail</span>
+                          <span className="text-lg font-extrabold text-emerald-400 block mt-0.5">{avail}</span>
+                        </div>
+                        <div className="bg-white/[0.02] border border-white/5 rounded-xl py-2 px-1">
+                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">In Use</span>
+                          <span className="text-lg font-extrabold text-indigo-300 block mt-0.5">{occ}</span>
+                        </div>
+                        <div className="bg-white/[0.02] border border-white/5 rounded-xl py-2 px-1">
+                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Held</span>
+                          <span className="text-lg font-extrabold text-amber-300 block mt-0.5">{res}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 space-y-1.5">
+                        <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                          <span>Occupancy</span>
+                          <span className="text-slate-400">{pct}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                          <div className={`h-full bg-gradient-to-r ${lib.accent} transition-all`} style={{ width: `${pct}%` }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
       const mineSeat =
         session && seats[session.libId] ? seats[session.libId].find((s) => s.id === session.seatId) : null;
       const sessionRemaining = mineSeat?.sessionUntil ? mineSeat.sessionUntil - now : 0;
@@ -1461,7 +1830,7 @@
               <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
                 <button
                   type="button"
-                  onClick={() => setView('dash')}
+                  onClick={() => setView(user && user.role === 'admin' ? 'adminDash' : 'dash')}
                   className="group flex min-w-0 items-center gap-3 rounded-xl py-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
                 >
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-indigo-900/40 ring-1 ring-white/10 transition group-hover:ring-indigo-300/40">
@@ -1470,9 +1839,9 @@
                   <span className="min-w-0">
                     <span className="flex items-center gap-2">
                       <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-300">BIT</span>
-                      {view === 'dash' && (
+                      {(view === 'dash' || view === 'adminDash') && (
                         <span className="hidden rounded-md bg-white/5 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-500 ring-1 ring-white/10 sm:inline">
-                          Home
+                          {user && user.role === 'admin' ? 'Admin Console' : 'Home'}
                         </span>
                       )}
                     </span>
@@ -1481,13 +1850,13 @@
                 </button>
 
                 <div className="flex items-center gap-2 sm:gap-3">
-                  {user && (
+                  {user && user.role === 'admin' && (
                     <a
                       href="/print-qrs.html"
                       target="_blank"
-                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-indigo-300 hover:bg-white/10 transition"
+                      className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-bold text-indigo-300 hover:bg-white/10 transition ring-1 ring-white/10 hover:ring-white/20"
                     >
-                      <Icon name="layout-grid" size={16} />
+                      <Icon name="printer" size={16} />
                       <span className="hidden md:inline">Print QR Codes</span>
                     </a>
                   )}
@@ -1522,6 +1891,7 @@
             {view === 'login' && renderLogin()}
             {view === 'dash' && user && renderDash()}
             {view === 'map' && user && renderMap()}
+            {view === 'adminDash' && user && renderAdminDash()}
           </main>
 
           {/* Reserve modal */}
