@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Print QR Codes | Bangalore Institute of Technology</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'] },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: radial-gradient(1000px 600px at 50% 0%, rgba(99, 102, 241, 0.15), transparent), #030712;
+      color: #f8fafc;
+      min-height: 100vh;
+    }
+    .qr-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    
+    @media print {
+      body {
+        background: white !important;
+        color: black !important;
+        min-height: auto !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .qr-card {
+        background: white !important;
+        border: 2px solid #e2e8f0 !important;
+        box-shadow: none !important;
+        color: black !important;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        margin-bottom: 2rem;
+      }
+      .qr-card * {
+        color: black !important;
+      }
+      .qr-canvas {
+        filter: none !important;
+      }
+      .print-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 1.5rem !important;
+        display: grid !important;
+      }
+    }
+  </style>
+</head>
+<body class="p-6 sm:p-12">
+  <div class="max-w-6xl mx-auto">
+    <!-- Header Controls -->
+    <header class="no-print mb-12 flex flex-col md:flex-row md:items-center md:justify-between gap-6 border-b border-white/10 pb-8">
+      <div>
+        <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-indigo-300">
+          Admin Console
+        </div>
+        <h1 class="text-4xl font-extrabold text-white mt-3 tracking-tight">Print Bench QR Codes</h1>
+        <p class="text-slate-400 mt-2">Generate and print high-quality QR cards to stick on library benches. The layout is optimized for printing on A4 sheets.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/" class="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-sm font-semibold text-slate-300 hover:bg-white/10 transition">
+          ← Back to App
+        </a>
+        <button onclick="window.print()" class="px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-bold text-white shadow-xl shadow-indigo-950/40 hover:brightness-110 active:scale-[0.99] transition">
+          Print Cards
+        </button>
+      </div>
+    </header>
+
+    <!-- Loading State -->
+    <div id="loading" class="flex flex-col items-center justify-center py-20">
+      <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent mb-4"></div>
+      <p class="text-slate-400 font-medium">Fetching seat list & generating QR codes...</p>
+    </div>
+
+    <!-- Cards Container -->
+    <main id="qr-container" class="print-grid grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <!-- Generated Cards go here -->
+    </main>
+  </div>
+
+  <script>
+    const LIBRARIES_MAP = {
+      lib1: { name: 'Main Study Hall', tag: 'LIB-1' },
+      lib2: { name: 'Engineering Library', tag: 'LIB-2' },
+      lib3: { name: 'Quiet Zone', tag: 'LIB-3' }
+    };
+
+    function showAccessDenied(message) {
+      document.getElementById('loading').style.display = 'none';
+      
+      // Hide print header controls on access denied
+      const header = document.querySelector('header');
+      if (header) {
+        header.style.display = 'none';
+      }
+      
+      const container = document.getElementById('qr-container');
+      if (container) {
+        container.style.display = 'none';
+      }
+      
+      const wrapper = document.createElement('div');
+      wrapper.className = "flex flex-col items-center justify-center min-h-[70vh] py-20 text-center animate-pulse";
+      wrapper.innerHTML = `
+        <div class="inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-red-500/10 text-red-400 border border-red-500/20 mb-6 shadow-lg shadow-red-950/20">
+          <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <h2 class="text-3xl font-extrabold text-white tracking-tight">Access Denied</h2>
+        <p class="text-slate-400 mt-3 max-w-md leading-relaxed px-4">${message}</p>
+        <a href="/" class="mt-8 inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 text-sm font-bold text-white shadow-lg hover:brightness-110 transition active:scale-[0.99]">
+          Return to Dashboard
+        </a>
+      `;
+      
+      document.getElementById('qr-container').parentNode.appendChild(wrapper);
+    }
+
+    async function loadQRs() {
+      try {
+        const token = localStorage.getItem('bit_token');
+        if (!token) {
+          showAccessDenied('You must be signed in as an administrator to access the QR print console.');
+          return;
+        }
+
+        const response = await fetch('/api/admin/qr-codes', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.status === 401 || response.status === 403) {
+          showAccessDenied('Unauthorized access. Only system administrators are authorized to generate or print bench QR codes.');
+          return;
+        }
+        
+        if (!response.ok) throw new Error('Failed to retrieve secure QR code configurations.');
+        const data = await response.json();
+        
+        const container = document.getElementById('qr-container');
+        container.innerHTML = '';
+        document.getElementById('loading').style.display = 'none';
+
+        // Flatten all seats across libraries
+        const seatsList = [];
+        Object.keys(data.seats).forEach(libId => {
+          data.seats[libId].forEach(seat => {
+            seatsList.push({ ...seat, libId });
+          });
+        });
+
+        // Generate card for each seat
+        for (const seat of seatsList) {
+          const libInfo = LIBRARIES_MAP[seat.libId] || { name: 'Library', tag: seat.libId.toUpperCase() };
+          const shortCode = seat.qrToken.slice(-6).toUpperCase();
+          const checkinUrl = `${window.location.origin}/?checkinSeatId=${seat.id}&qrToken=${seat.qrToken}`;
+
+          const card = document.createElement('div');
+          card.className = 'qr-card rounded-[2rem] p-8 flex flex-col items-center text-center relative overflow-hidden';
+          card.innerHTML = `
+            <!-- Top branding banner -->
+            <div class="w-full flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+              <div class="text-left">
+                <span class="block text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">BIT BANGALORE</span>
+                <span class="block text-[8px] font-medium text-slate-500 uppercase">Library Seat Booking</span>
+              </div>
+              <span class="rounded-xl bg-indigo-500/10 border border-indigo-400/20 px-3 py-1 text-xs font-black text-indigo-300">
+                ${libInfo.tag}
+              </span>
+            </div>
+
+            <!-- Seat Designation -->
+            <h2 class="text-2xl font-extrabold text-white leading-tight">Bench Seat ${seat.num}</h2>
+            <p class="text-xs text-slate-400 mt-1">${libInfo.name}</p>
+
+            <!-- QR Code Canvas container -->
+            <div class="my-6 p-4 bg-white rounded-2xl shadow-lg relative flex items-center justify-center">
+              <canvas id="canvas-${seat.id}" class="qr-canvas"></canvas>
+            </div>
+
+            <!-- Instructions -->
+            <p class="text-xs font-bold text-slate-300 max-w-[200px] leading-relaxed">
+              Scan QR code with your phone camera to check in
+            </p>
+
+            <!-- Backup code -->
+            <div class="mt-5 pt-4 border-t border-white/5 w-full flex flex-col items-center">
+              <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Backup Verification Code</span>
+              <span class="text-lg font-black text-indigo-300 font-mono tracking-widest mt-1">${shortCode}</span>
+            </div>
+            
+            <p class="text-[8px] text-slate-600 mt-3 break-all max-w-[240px] font-mono select-none">${checkinUrl}</p>
+          `;
+
+          container.appendChild(card);
+
+          // Render the QR code onto the canvas
+          const canvas = document.getElementById(`canvas-${seat.id}`);
+          QRCode.toCanvas(canvas, checkinUrl, {
+            width: 160,
+            margin: 1,
+            color: {
+              dark: '#0f172a', // deep slate/black
+              light: '#ffffff'
+            }
+          }, function (error) {
+            if (error) console.error(error);
+          });
+        }
+      } catch (err) {
+        document.getElementById('loading').innerHTML = `
+          <div class="text-rose-500 font-bold mb-2">Error loading QR Codes</div>
+          <p class="text-slate-400 text-sm">${err.message}</p>
+        `;
+      }
+    }
+
+    window.onload = loadQRs;
+  </script>
+</body>
+</html>
